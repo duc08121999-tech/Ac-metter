@@ -279,22 +279,26 @@
     const pts = [];
     let smooth = null, lastSample = 0, yMax = 100, W = 0, H = 0;
 
-    function resize() {
+    let pendingResize = false;
+    function applySize() {
       const box = canvas.parentElement;
       const dpr = window.devicePixelRatio || 1;
-      W = box.clientWidth - 28;
-      H = box.clientHeight - 28;
+      const nw = box.clientWidth - 28, nh = box.clientHeight - 28;
+      if (nw === W && nh === H) return;   // kích thước không đổi thì không đụng vào canvas
+      W = nw; H = nh;
       canvas.style.width = W + "px";
       canvas.style.height = H + "px";
       canvas.width = Math.round(W * dpr);
       canvas.height = Math.round(H * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
-    resize();
-    window.addEventListener("resize", resize);
+    applySize();
+    // chỉ đánh dấu, việc đổi kích thước làm ngay trong khung vẽ kế tiếp để không bị chớp trống
+    window.addEventListener("resize", function () { pendingResize = true; });
 
     function draw(now) {
       requestAnimationFrame(draw);
+      if (pendingResize) { pendingResize = false; applySize(); }
 
       // lấy mẫu đều đặn, làm mịn về phía giá trị mới nhất
       if (latestPower !== null && !isNaN(latestPower)) {
