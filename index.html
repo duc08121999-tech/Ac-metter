@@ -64,6 +64,7 @@
 <div class="container">
   <h1>⚡ Giám Sát Điện Năng</h1>
   <div id="mqtt-info" class="mqtt-status">🔴 ĐANG KẾT NỐI BROKER MQTT...</div>
+  <div id="age" style="text-align:center;font-size:12px;color:var(--text-muted);margin:-10px 0 14px;"></div>
 
   <!-- Hàng 1: Điện áp - Dòng điện - Công suất -->
   <div class="row r3">
@@ -236,11 +237,18 @@
   // Nhận dữ liệu từ ESP32 và đẩy lên giao diện
   let gotData = false;
   const cache = {};
+  let lastMsg = 0, lastPow = 0, avgInt = 0;   // đo độ trễ và chu kỳ dữ liệu từ ESP32
   function onMessageArrived(message) {
     const topic = message.destinationName.replace(TOPIC_PREFIX + "/", "");
     const payload = message.payloadString;
     if (!gotData) { gotData = true; setStatus("🟢 ĐANG NHẬN DỮ LIỆU TRỰC TIẾP", true); }
     cache[topic] = payload;
+    const nowMs = Date.now();
+    lastMsg = nowMs;
+    if (topic === "power") {
+      if (lastPow) { const d = nowMs - lastPow; avgInt = avgInt ? avgInt * 0.7 + d * 0.3 : d; }
+      lastPow = nowMs;
+    }
     handleTopic(topic, payload);
   }
 
@@ -414,6 +422,16 @@
     if (!gotData) return;
     try { localStorage.setItem(CACHE_KEY, JSON.stringify(cache)); } catch (e) {}
   }, 5000);
+
+  // Hiển thị: dữ liệu mới nhất cách bao lâu, ESP32 gửi mỗi bao lâu
+  setInterval(function () {
+    const el = document.getElementById("age");
+    if (!lastMsg) { el.textContent = ""; return; }
+    const ago = (Date.now() - lastMsg) / 1000;
+    let t = "Dữ liệu mới nhất: " + ago.toFixed(1) + " giây trước";
+    if (avgInt) t += " · ESP32 gửi mỗi ~" + (avgInt / 1000).toFixed(1) + " giây";
+    el.textContent = t;
+  }, 200);
 
   // Bắt đầu kết nối
   connectMQTT();
