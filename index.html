@@ -6,7 +6,6 @@
   <title>Hệ Thống Giám Sát Điện Năng - MQTT Dashboard</title>
   <!-- Thư viện MQTT qua WebSocket (Paho) và đồ thị (Chart.js) - đã sửa đúng đường dẫn -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <style>
     :root {
       --bg-color: #0a0f1d;
@@ -57,7 +56,8 @@
     button { padding: 9px 8px; font-size: 14px; background: var(--neon-orange); color: #000; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
     button:active { background: #ffaa22; }
 
-    .chart-box { background: var(--card-bg); padding: 14px; border-radius: 12px; border: 1px solid var(--line); height: 270px; margin-top: 4px; }
+    .chart-box { background: var(--card-bg); padding: 14px; border-radius: 12px; border: 1px solid var(--line); height: 270px; margin-top: 4px; overflow: hidden; }
+    .chart-box canvas { display: block; }
   </style>
 </head>
 <body>
@@ -269,50 +269,127 @@
     alert("✔️ Đã gửi lệnh MQTT: " + value);
   }
 
-  // ================= ĐỒ THỊ THỜI GIAN THỰC =================
-  const ctx = document.getElementById("realtimeChart").getContext("2d");
-  const maxDataPoints = 30;
-  const realtimeChart = new Chart(ctx, {
-    type: "line",
-    data: {
-      labels: Array(maxDataPoints).fill(""),
-      datasets: [{
-        label: "Công Suất Tiêu Thụ Thực Tế (W)",
-        data: Array(maxDataPoints).fill(0),
-        borderColor: "#00f0ff",
-        backgroundColor: "rgba(0, 240, 255, 0.1)",
-        borderWidth: 2,
-        tension: 0.4,
-        pointRadius: 2,
-        fill: true
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: { duration: 900, easing: "linear" },
-      scales: {
-        y: { grid: { color: "#1f2a45" }, ticks: { color: "#707e94" } },
-        x: { grid: { display: false }, ticks: { color: "#707e94", maxTicksLimit: 5, maxRotation: 0 } }
-      },
-      plugins: { legend: { labels: { color: "#fff" } } }
-    }
-  });
-
-  // Mỗi giây thêm đúng 1 điểm (dùng giá trị công suất mới nhất) -> đồ thị chạy đều
+  // ================= ĐỒ THỊ CÔNG SUẤT (tự vẽ, cuộn liên tục theo thời gian) =================
   let latestPower = null;
-  let chartVal = null;
-  setInterval(function () {
-    if (latestPower === null || isNaN(latestPower)) return;
-    // làm mịn: mỗi giây tiến 50% về phía giá trị mới nhất, bớt gai nhọn
-    chartVal = (chartVal === null) ? latestPower : chartVal + (latestPower - chartVal) * 0.5;
-    const d = realtimeChart.data;
-    d.datasets[0].data.push(Math.round(chartVal * 10) / 10);
-    d.datasets[0].data.shift();
-    d.labels.push(new Date().toLocaleTimeString("vi-VN"));
-    d.labels.shift();
-    realtimeChart.update();
-  }, 1000);
+  (function () {
+    const canvas = document.getElementById("realtimeChart");
+    const ctx = canvas.getContext("2d");
+    const WINDOW = 60000;   // hiển thị 60 giây gần nhất
+    const SAMPLE = 250;     // lấy mẫu mỗi 0.25 giây
+    const pts = [];
+    let smooth = null, lastSample = 0, yMax = 100, W = 0, H = 0;
+
+    function resize() {
+      const box = canvas.parentElement;
+      const dpr = window.devicePixelRatio || 1;
+      W = box.clientWidth - 28;
+      H = box.clientHeight - 28;
+      canvas.style.width = W + "px";
+      canvas.style.height = H + "px";
+      canvas.width = Math.round(W * dpr);
+      canvas.height = Math.round(H * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    resize();
+    window.addEventListener("resize", resize);
+
+    function draw(now) {
+      requestAnimationFrame(draw);
+
+      // lấy mẫu đều đặn, làm mịn về phía giá trị mới nhất
+      if (latestPower !== null && !isNaN(latestPower)) {
+        if (smooth === null) smooth = latestPower;
+        if (now - lastSample >= SAMPLE) {
+          smooth += (latestPower - smooth) * 0.25;
+          pts.push({ t: now, v: smooth });
+          lastSample = now;
+        }
+      }
+      while (pts.length && now - pts[0].t > WINDOW + 2000) pts.shift();
+
+      // thang đo trục Y tự co giãn mượt
+      let top = 50;
+      for (const p of pts) if (p.v > top) top = p.v;
+      yMax += (top * 1.25 - yMax) * 0.08;
+
+      const x0 = 40, x1 = W - 4, y0 = 24, y1 = H - 18;
+      const xAt = t => x1 - (now - t) / WINDOW * (x1 - x0);
+      const yAt = v => y1 - (v / yMax) * (y1 - y0);
+
+      ctx.clearRect(0, 0, W, H);
+      ctx.font = "11px 'Segoe UI', Arial, sans-serif";
+
+      // tiêu đề + giá trị hiện tại
+      ctx.fillStyle = "#ffffff";
+      ctx.textAlign = "left";
+      ctx.fillText("Công suất tiêu thụ (W)", 0, 12);
+      if (smooth !== null) {
+        ctx.fillStyle = "#00f0ff";
+        ctx.textAlign = "right";
+        ctx.fillText(smooth.toFixed(1) + " W", W, 12);
+      }
+
+      // lưới ngang + nhãn trục Y
+      ctx.strokeStyle = "#1f2a45";
+      ctx.fillStyle = "#707e94";
+      ctx.lineWidth = 1;
+      ctx.textAlign = "right";
+      for (let i = 0; i <= 4; i++) {
+        const y = y1 - (y1 - y0) * i / 4;
+        ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke();
+        ctx.fillText(Math.round(yMax * i / 4), x0 - 6, y + 4);
+      }
+      // nhãn thời gian
+      ctx.textAlign = "left";   ctx.fillText("-60s", x0, H - 3);
+      ctx.textAlign = "center"; ctx.fillText("-30s", (x0 + x1) / 2, H - 3);
+      ctx.textAlign = "right";  ctx.fillText("nay", x1, H - 3);
+
+      if (pts.length < 2) {
+        ctx.fillStyle = "#707e94";
+        ctx.textAlign = "center";
+        ctx.fillText("Đang chờ dữ liệu công suất...", (x0 + x1) / 2, (y0 + y1) / 2);
+        return;
+      }
+
+      // đường công suất, cắt trong khung vẽ
+      ctx.save();
+      ctx.beginPath(); ctx.rect(x0, y0 - 2, x1 - x0 + 2, y1 - y0 + 4); ctx.clip();
+
+      ctx.beginPath();
+      ctx.moveTo(xAt(pts[0].t), yAt(pts[0].v));
+      for (let i = 1; i < pts.length - 1; i++) {
+        const mx = (xAt(pts[i].t) + xAt(pts[i + 1].t)) / 2;
+        const my = (yAt(pts[i].v) + yAt(pts[i + 1].v)) / 2;
+        ctx.quadraticCurveTo(xAt(pts[i].t), yAt(pts[i].v), mx, my);
+      }
+      const last = pts[pts.length - 1];
+      ctx.lineTo(xAt(last.t), yAt(last.v));
+      ctx.lineTo(x1, yAt(smooth));
+
+      ctx.strokeStyle = "#00f0ff";
+      ctx.lineWidth = 2;
+      ctx.lineJoin = "round";
+      ctx.stroke();
+
+      // vùng tô dưới đường
+      ctx.lineTo(x1, y1);
+      ctx.lineTo(xAt(pts[0].t), y1);
+      ctx.closePath();
+      const g = ctx.createLinearGradient(0, y0, 0, y1);
+      g.addColorStop(0, "rgba(0,240,255,0.25)");
+      g.addColorStop(1, "rgba(0,240,255,0)");
+      ctx.fillStyle = g;
+      ctx.fill();
+      ctx.restore();
+
+      // chấm giá trị hiện tại
+      ctx.beginPath();
+      ctx.arc(x1, yAt(smooth), 3.5, 0, Math.PI * 2);
+      ctx.fillStyle = "#00f0ff";
+      ctx.fill();
+    }
+    requestAnimationFrame(draw);
+  })();
 
   // Bắt đầu kết nối
   connectMQTT();
