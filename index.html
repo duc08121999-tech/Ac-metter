@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Hệ Thống Giám Sát Điện Năng - MQTT Dashboard</title>
+  <!-- Thư viện MQTT qua WebSocket (Paho) và đồ thị (Chart.js) - đã sửa đúng đường dẫn -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg-color: #0a0f1d;
+      --card-bg: #141b2d;
+      --text-main: #ffffff;
+      --text-muted: #707e94;
+      --neon-cyan: #00f0ff;
+      --neon-green: #00ff66;
+      --neon-orange: #ff9900;
+      --neon-red: #ff3366;
+    }
+    html, body { font-family: 'Segoe UI', Arial, sans-serif; background-color: var(--bg-color); color: var(--text-main); margin: 0; padding: 15px; }
+    .container { max-width: 1000px; margin: 0 auto; padding: 15px; }
+    h1 { text-align: center; color: var(--neon-cyan); font-size: 24px; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 5px; text-shadow: 0 0 10px rgba(0, 240, 255, 0.3); }
+    .mqtt-status { text-align: center; font-size: 14px; font-weight: bold; margin-bottom: 25px; color: var(--neon-red); }
+    .mqtt-status.connected { color: var(--neon-green); }
+
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-bottom: 20px; }
+    .card { background: var(--card-bg); padding: 18px; border-radius: 12px; border: 1px solid #1f2a45; box-shadow: 0 4px 15px rgba(0,0,0,0.3); position: relative; overflow: hidden; transition: all 0.3s; }
+    .card:hover { border-color: var(--neon-cyan); box-shadow: 0 0 15px rgba(0, 240, 255, 0.2); }
+    .card::before { content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: var(--neon-cyan); }
+    .card.money::before { background: var(--neon-green); }
+    .card.setting::before { background: var(--neon-orange); }
+
+    .label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; font-weight: bold; letter-spacing: 1px; }
+    .value { font-size: 26px; font-weight: bold; margin-top: 8px; display: flex; align-items: baseline; }
+    .unit { font-size: 14px; color: var(--text-muted); font-weight: normal; margin-left: 5px; }
+
+    .chart-box { background: var(--card-bg); padding: 20px; border-radius: 12px; border: 1px solid #1f2a45; margin-bottom: 20px; height: 280px; }
+    .control-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+    @media (max-width: 600px) { .control-panel { grid-template-columns: 1fr; } }
+
+    .input-group { display: flex; flex-direction: column; gap: 8px; }
+    input[type=number] { background: #0a0f1d; border: 1px solid #1f2a45; padding: 10px; color: #fff; font-size: 16px; border-radius: 6px; text-align: center; outline: none; }
+    input[type=number]:focus { border-color: var(--neon-cyan); }
+    button { padding: 10px 15px; font-size: 15px; background: var(--neon-orange); color: #000; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+    button:hover { background: #ffaa22; box-shadow: 0 0 10px rgba(255,153,0,0.5); }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>⚡ CYBERPUNK ENERGY DASHBOARD</h1>
+  <div id="mqtt-info" class="mqtt-status">🔴 ĐANG KẾT NỐI BROKER MQTT...</div>
+
+  <div class="grid">
+    <div class="card"><div class="label">Điện Áp</div><div class="value" id="v">0<span class="unit">V</span></div></div>
+    <div class="card"><div class="label">Dòng Điện</div><div class="value" id="a">0<span class="unit">A</span></div></div>
+    <div class="card"><div class="label">Công Suất</div><div class="value" id="w">0<span class="unit">W</span></div></div>
+    <div class="card"><div class="label">Tần Số</div><div class="value" id="hz">0<span class="unit">Hz</span></div></div>
+    <div class="card"><div class="label">Hệ Số Cos Phi</div><div class="value" id="pf">0<span class="unit"></span></div></div>
+    <div class="card"><div class="label">Điện Năng Hôm Nay</div><div class="value" id="kwh_hn">0<span class="unit">kWh</span></div></div>
+    <div class="card"><div class="label">Điện Năng Hôm Qua</div><div class="value" id="kwh_hq">0<span class="unit">kWh</span></div></div>
+    <div class="card"><div class="label">Điện Năng Tháng Này</div><div class="value" id="kwh_tn">0<span class="unit">kWh</span></div></div>
+    <div class="card"><div class="label">Điện Năng Tháng Trước</div><div class="value" id="kwh_tt">0<span class="unit">kWh</span></div></div>
+    <div class="card money"><div class="label">💰 TIỀN ĐIỆN THÁNG NÀY</div><div class="value" id="tien_tn" style="color:var(--neon-green);">0<span class="unit">đ</span></div></div>
+    <div class="card money"><div class="label">🗓️ TIỀN ĐIỆN THÁNG TRƯỚC</div><div class="value" id="tien_tt" style="color:#b559ff;">0<span class="unit">đ</span></div></div>
+  </div>
+
+  <div class="chart-box">
+    <canvas id="realtimeChart"></canvas>
+  </div>
+
+  <div class="control-panel">
+    <div class="card setting">
+      <div class="label" style="color:var(--neon-orange);">📅 CÀI NGÀY CHỐT SỔ (Hiện tại: <span id="lbl_ngay">--</span>)</div>
+      <div class="input-group" style="margin-top:10px;">
+        <input type="number" id="input_ngay" min="1" max="28" value="2">
+        <button onclick="publishSetting('set_ngaychot', 'input_ngay')">Cập nhật Ngày</button>
+      </div>
+    </div>
+    <div class="card setting">
+      <div class="label" style="color:var(--neon-orange);">💰 CÀI ĐƠN GIÁ ĐIỆN (Hiện tại: <span id="lbl_gia">--</span> đ)</div>
+      <div class="input-group" style="margin-top:10px;">
+        <input type="number" id="input_gia" value="3500">
+        <button onclick="publishSetting('set_dongia', 'input_gia')">Cập nhật Đơn Giá</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ================= CẤU HÌNH MQTT =================
+  // Broker công cộng HiveMQ: WebSocket thường = 8000, WebSocket bảo mật (SSL) = 8884
+  const MQTT_BROKER = "broker.hivemq.com";
+  const USE_SSL     = true;                 // true -> cổng 8884, false -> cổng 8000
+  const MQTT_PORT   = USE_SSL ? 8884 : 8000;
+  const MQTT_PATH   = "/mqtt";              // HiveMQ bắt buộc đường dẫn /mqtt
+
+  // Tiền tố topic: PHẢI trùng với ESP32. Nên đổi thành chuỗi riêng của bạn
+  // (ví dụ "pzem_nhatoi_8841") vì broker công cộng ai cũng đọc/ghi được.
+  const TOPIC_PREFIX = "pzem";
+
+  const CLIENT_ID = "Web_Dashboard_" + Math.random().toString(16).substr(2, 8);
+
+  const infoEl = document.getElementById("mqtt-info");
+  function setStatus(text, ok) {
+    infoEl.innerHTML = text;
+    infoEl.className = "mqtt-status" + (ok ? " connected" : "");
+  }
+  function setValue(id, text, unit) {
+    document.getElementById(id).innerHTML = text + (unit ? '<span class="unit">' + unit + '</span>' : '');
+  }
+
+  // Paho 1.0.1: Client(host, port, path, clientId)
+  const client = new Paho.MQTT.Client(MQTT_BROKER, MQTT_PORT, MQTT_PATH, CLIENT_ID);
+  client.onConnectionLost = onConnectionLost;
+  client.onMessageArrived = onMessageArrived;
+
+  let reconnectTimer = null;
+
+  function connectMQTT() {
+    setStatus("🔴 ĐANG KẾT NỐI BROKER MQTT...", false);
+    try {
+      client.connect({
+        onSuccess: onConnect,
+        onFailure: onFailure,
+        useSSL: USE_SSL,
+        timeout: 10,
+        keepAliveInterval: 30,
+        cleanSession: true
+      });
+    } catch (e) {
+      setStatus("🔴 LỖI KẾT NỐI: " + e.message, false);
+      scheduleReconnect();
+    }
+  }
+
+  function scheduleReconnect() {
+    if (reconnectTimer) return;
+    reconnectTimer = setTimeout(function () {
+      reconnectTimer = null;
+      connectMQTT();
+    }, 5000);
+  }
+
+  function onConnect() {
+    setStatus("🟢 ĐÃ KẾT NỐI BROKER MQTT THÀNH CÔNG", true);
+    client.subscribe(TOPIC_PREFIX + "/#");
+  }
+
+  function onFailure(err) {
+    setStatus("🔴 KẾT NỐI THẤT BẠI: " + (err.errorMessage || err.errorCode) + " - thử lại sau 5 giây", false);
+    scheduleReconnect();
+  }
+
+  function onConnectionLost(resp) {
+    setStatus("🔴 MẤT KẾT NỐI MQTT, ĐANG THỬ LẠI...", false);
+    scheduleReconnect();
+  }
+
+  // Nhận dữ liệu từ ESP32 và đẩy lên giao diện
+  function onMessageArrived(message) {
+    const topic = message.destinationName.replace(TOPIC_PREFIX + "/", "");
+    const payload = message.payloadString;
+
+    switch (topic) {
+      case "voltage":   setValue("v", payload, "V"); break;
+      case "current":   setValue("a", payload, "A"); break;
+      case "power":
+        setValue("w", payload, "W");
+        updateChart(Number(payload));
+        break;
+      case "frequency": setValue("hz", payload, "Hz"); break;
+      case "pf":        setValue("pf", payload, ""); break;
+      case "kwh_homnay":      setValue("kwh_hn", payload, "kWh"); break;
+      case "kwh_homqua":      setValue("kwh_hq", payload, "kWh"); break;
+      case "kwh_thangnay":    setValue("kwh_tn", payload, "kWh"); break;
+      case "kwh_thangtruoc":  setValue("kwh_tt", payload, "kWh"); break;
+      case "tien_thangnay":   setValue("tien_tn", Number(payload).toLocaleString("vi-VN"), "đ"); break;
+      case "tien_thangtruoc": setValue("tien_tt", Number(payload).toLocaleString("vi-VN"), "đ"); break;
+      case "status_ngaychot": document.getElementById("lbl_ngay").innerText = payload; break;
+      case "status_dongia":   document.getElementById("lbl_gia").innerText = Number(payload).toLocaleString("vi-VN"); break;
+    }
+  }
+
+  // Gửi cấu hình xuống ESP32 (topic: <prefix>/set_ngaychot, <prefix>/set_dongia)
+  function publishSetting(subTopic, inputId) {
+    const value = document.getElementById(inputId).value;
+    if (!value || Number(value) <= 0) { alert("Vui lòng nhập giá trị hợp lệ!"); return; }
+    if (!client.isConnected()) { alert("Chưa kết nối MQTT, vui lòng đợi kết nối lại!"); return; }
+
+    const message = new Paho.MQTT.Message(value.toString());
+    message.destinationName = TOPIC_PREFIX + "/" + subTopic;
+    client.send(message);
+    alert("✔️ Đã gửi lệnh MQTT: " + value);
+  }
+
+  // ================= ĐỒ THỊ THỜI GIAN THỰC =================
+  const ctx = document.getElementById("realtimeChart").getContext("2d");
+  const maxDataPoints = 15;
+  const realtimeChart = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: Array(maxDataPoints).fill(""),
+      datasets: [{
+        label: "Công Suất Tiêu Thụ Thực Tế (W)",
+        data: Array(maxDataPoints).fill(0),
+        borderColor: "#00f0ff",
+        backgroundColor: "rgba(0, 240, 255, 0.1)",
+        borderWidth: 2,
+        tension: 0.4,
+        pointRadius: 2,
+        fill: true
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: { grid: { color: "#1f2a45" }, ticks: { color: "#707e94" } },
+        x: { grid: { display: false } }
+      },
+      plugins: { legend: { labels: { color: "#fff" } } }
+    }
+  });
+
+  function updateChart(newValue) {
+    if (isNaN(newValue)) return;
+    realtimeChart.data.datasets[0].data.push(newValue);
+    realtimeChart.data.datasets[0].data.shift();
+    realtimeChart.update("none");
+  }
+
+  // Bắt đầu kết nối
+  connectMQTT();
+</script>
+</body>
+</html>
