@@ -199,7 +199,7 @@
         onSuccess: onConnect,
         onFailure: onFailure,
         useSSL: USE_SSL,
-        timeout: 10,
+        timeout: 6,
         keepAliveInterval: 30,
         cleanSession: true
       });
@@ -214,16 +214,17 @@
     reconnectTimer = setTimeout(function () {
       reconnectTimer = null;
       connectMQTT();
-    }, 5000);
+    }, 2000);
   }
 
   function onConnect() {
-    setStatus("🟢 ĐÃ KẾT NỐI BROKER MQTT THÀNH CÔNG", true);
+    gotData = false;
+    setStatus("🟢 ĐÃ KẾT NỐI BROKER - ĐANG CHỜ DỮ LIỆU TỪ ESP32...", true);
     client.subscribe(TOPIC_PREFIX + "/#");
   }
 
   function onFailure(err) {
-    setStatus("🔴 KẾT NỐI THẤT BẠI: " + (err.errorMessage || err.errorCode) + " - thử lại sau 5 giây", false);
+    setStatus("🔴 KẾT NỐI THẤT BẠI: " + (err.errorMessage || err.errorCode) + " - thử lại sau 2 giây", false);
     scheduleReconnect();
   }
 
@@ -233,10 +234,17 @@
   }
 
   // Nhận dữ liệu từ ESP32 và đẩy lên giao diện
+  let gotData = false;
+  const cache = {};
   function onMessageArrived(message) {
     const topic = message.destinationName.replace(TOPIC_PREFIX + "/", "");
     const payload = message.payloadString;
+    if (!gotData) { gotData = true; setStatus("🟢 ĐANG NHẬN DỮ LIỆU TRỰC TIẾP", true); }
+    cache[topic] = payload;
+    handleTopic(topic, payload);
+  }
 
+  function handleTopic(topic, payload) {
     switch (topic) {
       case "voltage":   setValue("v", payload, "V"); break;
       case "current":   setValue("a", payload, "A"); break;
@@ -394,6 +402,18 @@
     }
     requestAnimationFrame(draw);
   })();
+
+  // Hiện ngay số liệu lần trước (nếu có) trong lúc chờ kết nối, số mới tới sẽ thay thế
+  const CACHE_KEY = "pzem_cache_" + TOPIC_PREFIX;
+  try {
+    const saved = JSON.parse(localStorage.getItem(CACHE_KEY) || "{}");
+    for (const t in saved) handleTopic(t, saved[t]);
+    latestPower = null;   // không đưa số cũ vào đồ thị
+  } catch (e) {}
+  setInterval(function () {
+    if (!gotData) return;
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify(cache)); } catch (e) {}
+  }, 5000);
 
   // Bắt đầu kết nối
   connectMQTT();
