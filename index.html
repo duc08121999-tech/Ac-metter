@@ -32,7 +32,7 @@
     .card.setting::before { background: var(--neon-orange); }
 
     .label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; font-weight: bold; letter-spacing: 1px; }
-    .value { font-size: 26px; font-weight: bold; margin-top: 8px; display: flex; align-items: baseline; }
+    .value { font-size: 26px; font-weight: bold; margin-top: 8px; display: flex; align-items: baseline; font-variant-numeric: tabular-nums; }
     .unit { font-size: 14px; color: var(--text-muted); font-weight: normal; margin-left: 5px; }
 
     .chart-box { background: var(--card-bg); padding: 20px; border-radius: 12px; border: 1px solid #1f2a45; margin-bottom: 20px; height: 280px; }
@@ -109,8 +109,10 @@
   // Cập nhật số có hiệu ứng chuyển mượt (0.4 giây), gom vào một vòng vẽ chung
   const anim = {};
   let animRunning = false;
+  const elCache = {};
   function render(id, text, unit) {
-    document.getElementById(id).innerHTML = text + (unit ? '<span class="unit">' + unit + '</span>' : '');
+    const el = elCache[id] || (elCache[id] = document.getElementById(id));
+    el.firstChild.nodeValue = text;   // chỉ đổi chữ số, đơn vị giữ nguyên
   }
   function setValue(id, raw, unit, money) {
     const target = Number(raw);
@@ -132,8 +134,8 @@
     let active = false;
     for (const id in anim) {
       const a = anim[id];
-      const t = Math.min(1, (now - a.start) / 400);
-      const e = 1 - Math.pow(1 - t, 3);                 // easeOutCubic
+      const t = Math.min(1, (now - a.start) / 900);
+      const e = 1 - (1 - t) * (1 - t);                  // easeOutQuad
       a.cur = a.from + (a.target - a.from) * e;
       const txt = a.money
         ? Math.round(a.cur).toLocaleString("vi-VN")
@@ -249,6 +251,7 @@
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      animation: { duration: 900, easing: "linear" },
       scales: {
         y: { grid: { color: "#1f2a45" }, ticks: { color: "#707e94" } },
         x: { grid: { display: false }, ticks: { color: "#707e94", maxTicksLimit: 5, maxRotation: 0 } }
@@ -259,14 +262,17 @@
 
   // Mỗi giây thêm đúng 1 điểm (dùng giá trị công suất mới nhất) -> đồ thị chạy đều
   let latestPower = null;
+  let chartVal = null;
   setInterval(function () {
     if (latestPower === null || isNaN(latestPower)) return;
+    // làm mịn: mỗi giây tiến 50% về phía giá trị mới nhất, bớt gai nhọn
+    chartVal = (chartVal === null) ? latestPower : chartVal + (latestPower - chartVal) * 0.5;
     const d = realtimeChart.data;
-    d.datasets[0].data.push(latestPower);
+    d.datasets[0].data.push(Math.round(chartVal * 10) / 10);
     d.datasets[0].data.shift();
     d.labels.push(new Date().toLocaleTimeString("vi-VN"));
     d.labels.shift();
-    realtimeChart.update("none");
+    realtimeChart.update();
   }, 1000);
 
   // Bắt đầu kết nối
