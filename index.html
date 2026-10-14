@@ -56,8 +56,11 @@
     button { padding: 9px 8px; font-size: 14px; background: var(--neon-orange); color: #000; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
     button:active { background: #ffaa22; }
 
-    .chart-box { background: var(--card-bg); padding: 14px; border-radius: 12px; border: 1px solid var(--line); height: 270px; margin-top: 4px; overflow: hidden; }
+    .chart-box { background: var(--card-bg); padding: 14px; border-radius: 12px; border: 1px solid var(--line); height: 300px; margin-top: 4px; overflow: hidden; }
     .chart-box canvas { display: block; }
+    .range { display: flex; gap: 6px; margin-bottom: 6px; }
+    .range button { flex: 1; padding: 5px 0; font-size: 12px; background: transparent; color: var(--text-muted); border: 1px solid var(--line); border-radius: 6px; font-weight: 600; }
+    .range button.on { color: #000; background: var(--neon-cyan); border-color: var(--neon-cyan); }
   </style>
 </head>
 <body>
@@ -123,6 +126,11 @@
 
   <!-- Hàng cuối: Biểu đồ -->
   <div class="chart-box">
+    <div class="range" id="range">
+      <button data-w="60000">1 phút</button>
+      <button data-w="600000">10 phút</button>
+      <button data-w="3600000">1 giờ</button>
+    </div>
     <canvas id="realtimeChart"></canvas>
   </div>
 </div>
@@ -192,8 +200,11 @@
   client.onMessageArrived = onMessageArrived;
 
   let reconnectTimer = null;
+  let connecting = false;
 
   function connectMQTT() {
+    if (connecting) return;
+    connecting = true;
     setStatus("🔴 ĐANG KẾT NỐI BROKER MQTT...", false);
     try {
       client.connect({
@@ -205,6 +216,7 @@
         cleanSession: true
       });
     } catch (e) {
+      connecting = false;
       setStatus("🔴 LỖI KẾT NỐI: " + e.message, false);
       scheduleReconnect();
     }
@@ -219,12 +231,14 @@
   }
 
   function onConnect() {
+    connecting = false;
     gotData = false;
     setStatus("🟢 ĐÃ KẾT NỐI BROKER - ĐANG CHỜ DỮ LIỆU TỪ ESP32...", true);
     client.subscribe(TOPIC_PREFIX + "/#");
   }
 
   function onFailure(err) {
+    connecting = false;
     setStatus("🔴 KẾT NỐI THẤT BẠI: " + (err.errorMessage || err.errorCode) + " - thử lại sau 2 giây", false);
     scheduleReconnect();
   }
@@ -285,22 +299,58 @@
     alert("✔️ Đã gửi lệnh MQTT: " + value);
   }
 
-  // ================= ĐỒ THỊ CÔNG SUẤT (tự vẽ, cuộn liên tục theo thời gian) =================
+  // ================= ĐỒ THỊ CÔNG SUẤT (tự vẽ, cuộn liên tục, có lưu lịch sử) =================
   let latestPower = null;
   (function () {
     const canvas = document.getElementById("realtimeChart");
     const ctx = canvas.getContext("2d");
-    const WINDOW = 60000;   // hiển thị 60 giây gần nhất
-    const SAMPLE = 250;     // lấy mẫu mỗi 0.25 giây
-    const pts = [];
-    let smooth = null, lastSample = 0, yMax = 100, W = 0, H = 0;
+    const rangeEl = document.getElementById("range");
+    const SAMPLE = 250;          // mẫu mịn cho đồ thị 1 phút
+    const HIST_STEP = 2000;      // mẫu lưu lịch sử: 2 giây/điểm
+    const HIST_KEEP = 3600000;   // giữ lịch sử 1 giờ
+    const HKEY = "pzem_hist_" + TOPIC_PREFIX;
+    const WKEY = "pzem_win_" + TOPIC_PREFIX;
+    const LABELS = { 60000: "1 phút", 600000: "10 phút", 3600000: "1 giờ" };
 
+    let win = 60000;
+    try { const w = Number(localStorage.getItem(WKEY)); if (LABELS[w]) win = w; } catch (err) {}
+
+    // khôi phục lịch sử đã lưu lần trước
+    let pts = [], hist = [];
+    try {
+      const raw = JSON.parse(localStorage.getItem(HKEY) || "[]");
+      const t0 = Date.now() - HIST_KEEP;
+      hist = raw.filter(a => a[0] > t0).map(a => ({ t: a[0], v: a[1] }));
+      pts = hist.filter(p => p.t > Date.now() - 62000);
+    } catch (err) {}
+
+    function saveHist() {
+      try { localStorage.setItem(HKEY, JSON.stringify(hist.map(p => [p.t, Math.round(p.v * 10) / 10]))); } catch (err) {}
+    }
+    setInterval(saveHist, 10000);
+    document.addEventListener("visibilitychange", function () { if (document.visibilityState === "hidden") saveHist(); });
+    window.addEventListener("pagehide", saveHist);
+
+    function markRange() {
+      rangeEl.querySelectorAll("button").forEach(b => b.classList.toggle("on", Number(b.dataset.w) === win));
+    }
+    rangeEl.addEventListener("click", function (ev) {
+      const b = ev.target.closest("button");
+      if (!b) return;
+      win = Number(b.dataset.w);
+      try { localStorage.setItem(WKEY, String(win)); } catch (err) {}
+      markRange();
+    });
+    markRange();
+
+    let smooth = null, lastSample = 0, lastHist = 0, yMax = 100, W = 0, H = 0;
     let pendingResize = false;
     function applySize() {
       const box = canvas.parentElement;
       const dpr = window.devicePixelRatio || 1;
-      const nw = box.clientWidth - 28, nh = box.clientHeight - 28;
-      if (nw === W && nh === H) return;   // kích thước không đổi thì không đụng vào canvas
+      const nw = box.clientWidth - 28;
+      const nh = box.clientHeight - 28 - rangeEl.offsetHeight - 6;
+      if (nw === W && nh === H) return;
       W = nw; H = nh;
       canvas.style.width = W + "px";
       canvas.style.height = H + "px";
@@ -309,47 +359,60 @@
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
     applySize();
-    // chỉ đánh dấu, việc đổi kích thước làm ngay trong khung vẽ kế tiếp để không bị chớp trống
     window.addEventListener("resize", function () { pendingResize = true; });
 
-    function draw(now) {
+    // tách thành các đoạn liền nhau; chỗ ngắt quãng (đóng trang, mất tín hiệu) không bị nối dây
+    function segments(arr, gap, from) {
+      const out = []; let cur = [];
+      for (const p of arr) {
+        if (p.t < from) continue;
+        if (cur.length && p.t - cur[cur.length - 1].t > gap) { out.push(cur); cur = []; }
+        cur.push(p);
+      }
+      if (cur.length) out.push(cur);
+      return out;
+    }
+
+    function draw() {
       requestAnimationFrame(draw);
       if (pendingResize) { pendingResize = false; applySize(); }
+      const nowMs = Date.now();
 
-      // lấy mẫu đều đặn, làm mịn về phía giá trị mới nhất
-      if (latestPower !== null && !isNaN(latestPower)) {
-        if (smooth === null) smooth = latestPower;
-        if (now - lastSample >= SAMPLE) {
+      // chỉ ghi điểm khi ESP32 đang gửi dữ liệu mới
+      const fresh = lastPow > 0 && (nowMs - lastPow) < 6000 && latestPower !== null && !isNaN(latestPower);
+      if (fresh) {
+        if (smooth === null || nowMs - lastSample > 3000) smooth = latestPower;
+        if (nowMs - lastSample >= SAMPLE) {
           smooth += (latestPower - smooth) * 0.25;
-          pts.push({ t: now, v: smooth });
-          lastSample = now;
+          pts.push({ t: nowMs, v: smooth });
+          lastSample = nowMs;
         }
+        if (nowMs - lastHist >= HIST_STEP) { hist.push({ t: nowMs, v: smooth }); lastHist = nowMs; }
       }
-      while (pts.length && now - pts[0].t > WINDOW + 2000) pts.shift();
+      while (pts.length && nowMs - pts[0].t > 62000) pts.shift();
+      while (hist.length && nowMs - hist[0].t > HIST_KEEP + 10000) hist.shift();
 
-      // thang đo trục Y tự co giãn mượt
+      const src = win <= 60000 ? pts : hist;
+      const gap = win <= 60000 ? 3000 : 8000;
+
       let top = 50;
-      for (const p of pts) if (p.v > top) top = p.v;
+      for (const p of src) if (p.t >= nowMs - win && p.v > top) top = p.v;
       yMax += (top * 1.25 - yMax) * 0.08;
 
       const x0 = 40, x1 = W - 4, y0 = 24, y1 = H - 18;
-      const xAt = t => x1 - (now - t) / WINDOW * (x1 - x0);
+      const xAt = t => x1 - (nowMs - t) / win * (x1 - x0);
       const yAt = v => y1 - (v / yMax) * (y1 - y0);
 
       ctx.clearRect(0, 0, W, H);
       ctx.font = "11px 'Segoe UI', Arial, sans-serif";
 
-      // tiêu đề + giá trị hiện tại
       ctx.fillStyle = "#ffffff";
       ctx.textAlign = "left";
       ctx.fillText("Công suất tiêu thụ (W)", 0, 12);
-      if (smooth !== null) {
-        ctx.fillStyle = "#00f0ff";
-        ctx.textAlign = "right";
-        ctx.fillText(smooth.toFixed(1) + " W", W, 12);
-      }
+      ctx.textAlign = "right";
+      if (fresh && smooth !== null) { ctx.fillStyle = "#00f0ff"; ctx.fillText(smooth.toFixed(1) + " W", W, 12); }
+      else if (lastPow > 0) { ctx.fillStyle = "#ff9900"; ctx.fillText("Mất tín hiệu từ ESP32", W, 12); }
 
-      // lưới ngang + nhãn trục Y
       ctx.strokeStyle = "#1f2a45";
       ctx.fillStyle = "#707e94";
       ctx.lineWidth = 1;
@@ -359,54 +422,59 @@
         ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke();
         ctx.fillText(Math.round(yMax * i / 4), x0 - 6, y + 4);
       }
-      // nhãn thời gian
-      ctx.textAlign = "left";   ctx.fillText("-60s", x0, H - 3);
-      ctx.textAlign = "center"; ctx.fillText("-30s", (x0 + x1) / 2, H - 3);
+      ctx.textAlign = "left";   ctx.fillText("-" + LABELS[win], x0, H - 3);
+      ctx.textAlign = "center"; ctx.fillText("-" + LABELS[win].replace(/^\d+/, function (n) { return n / 2; }), (x0 + x1) / 2, H - 3);
       ctx.textAlign = "right";  ctx.fillText("nay", x1, H - 3);
 
-      if (pts.length < 2) {
+      const segs = segments(src, gap, nowMs - win - 5000);
+      if (!segs.length) {
         ctx.fillStyle = "#707e94";
         ctx.textAlign = "center";
         ctx.fillText("Đang chờ dữ liệu công suất...", (x0 + x1) / 2, (y0 + y1) / 2);
         return;
       }
 
-      // đường công suất, cắt trong khung vẽ
-      ctx.save();
-      ctx.beginPath(); ctx.rect(x0, y0 - 2, x1 - x0 + 2, y1 - y0 + 4); ctx.clip();
-
-      ctx.beginPath();
-      ctx.moveTo(xAt(pts[0].t), yAt(pts[0].v));
-      for (let i = 1; i < pts.length - 1; i++) {
-        const mx = (xAt(pts[i].t) + xAt(pts[i + 1].t)) / 2;
-        const my = (yAt(pts[i].v) + yAt(pts[i + 1].v)) / 2;
-        ctx.quadraticCurveTo(xAt(pts[i].t), yAt(pts[i].v), mx, my);
+      function trace(seg) {
+        ctx.moveTo(xAt(seg[0].t), yAt(seg[0].v));
+        if (seg.length === 1) { ctx.lineTo(xAt(seg[0].t) + 0.01, yAt(seg[0].v)); return; }
+        for (let i = 1; i < seg.length - 1; i++) {
+          const mx = (xAt(seg[i].t) + xAt(seg[i + 1].t)) / 2;
+          const my = (yAt(seg[i].v) + yAt(seg[i + 1].v)) / 2;
+          ctx.quadraticCurveTo(xAt(seg[i].t), yAt(seg[i].v), mx, my);
+        }
+        const l = seg[seg.length - 1];
+        ctx.lineTo(xAt(l.t), yAt(l.v));
       }
-      const last = pts[pts.length - 1];
-      ctx.lineTo(xAt(last.t), yAt(last.v));
-      ctx.lineTo(x1, yAt(smooth));
 
-      ctx.strokeStyle = "#00f0ff";
-      ctx.lineWidth = 2;
-      ctx.lineJoin = "round";
-      ctx.stroke();
-
-      // vùng tô dưới đường
-      ctx.lineTo(x1, y1);
-      ctx.lineTo(xAt(pts[0].t), y1);
-      ctx.closePath();
       const g = ctx.createLinearGradient(0, y0, 0, y1);
       g.addColorStop(0, "rgba(0,240,255,0.25)");
       g.addColorStop(1, "rgba(0,240,255,0)");
-      ctx.fillStyle = g;
-      ctx.fill();
+
+      ctx.save();
+      ctx.beginPath(); ctx.rect(x0, y0 - 2, x1 - x0 + 2, y1 - y0 + 4); ctx.clip();
+      segs.forEach(function (seg, idx) {
+        const head = fresh && idx === segs.length - 1;
+        ctx.beginPath();
+        trace(seg);
+        if (head) ctx.lineTo(x1, yAt(smooth));
+        ctx.strokeStyle = "#00f0ff";
+        ctx.lineWidth = 2;
+        ctx.lineJoin = "round";
+        ctx.stroke();
+        ctx.lineTo(head ? x1 : xAt(seg[seg.length - 1].t), y1);
+        ctx.lineTo(xAt(seg[0].t), y1);
+        ctx.closePath();
+        ctx.fillStyle = g;
+        ctx.fill();
+      });
       ctx.restore();
 
-      // chấm giá trị hiện tại
-      ctx.beginPath();
-      ctx.arc(x1, yAt(smooth), 3.5, 0, Math.PI * 2);
-      ctx.fillStyle = "#00f0ff";
-      ctx.fill();
+      if (fresh) {
+        ctx.beginPath();
+        ctx.arc(x1, yAt(smooth), 3.5, 0, Math.PI * 2);
+        ctx.fillStyle = "#00f0ff";
+        ctx.fill();
+      }
     }
     requestAnimationFrame(draw);
   })();
@@ -432,6 +500,22 @@
     if (avgInt) t += " · ESP32 gửi mỗi ~" + (avgInt / 1000).toFixed(1) + " giây";
     el.textContent = t;
   }, 200);
+
+  // Quay lại trang / có mạng trở lại: nối lại ngay, không đợi chu kỳ tự thử lại
+  function forceReconnect() {
+    if (connecting) return;
+    if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+    try { if (client.isConnected()) client.disconnect(); } catch (e) {}
+    setTimeout(connectMQTT, 150);
+  }
+  function wake() {
+    if (document.visibilityState === "hidden") return;
+    // đã rớt, hoặc kết nối còn nhưng 10 giây không có dữ liệu (thường do trình duyệt tạm ngưng trang)
+    if (!client.isConnected() || (lastMsg && Date.now() - lastMsg > 10000)) forceReconnect();
+  }
+  document.addEventListener("visibilitychange", wake);
+  window.addEventListener("pageshow", wake);
+  window.addEventListener("online", wake);
 
   // Bắt đầu kết nối
   connectMQTT();
