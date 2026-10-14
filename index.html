@@ -11,79 +11,118 @@
     :root {
       --bg-color: #0a0f1d;
       --card-bg: #141b2d;
+      --line: #1f2a45;
       --text-main: #ffffff;
       --text-muted: #707e94;
       --neon-cyan: #00f0ff;
       --neon-green: #00ff66;
       --neon-orange: #ff9900;
       --neon-red: #ff3366;
+      --neon-purple: #b559ff;
     }
-    html, body { font-family: 'Segoe UI', Arial, sans-serif; background-color: var(--bg-color); color: var(--text-main); margin: 0; padding: 15px; }
-    .container { max-width: 1000px; margin: 0 auto; padding: 15px; }
-    h1 { text-align: center; color: var(--neon-cyan); font-size: 24px; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 5px; text-shadow: 0 0 10px rgba(0, 240, 255, 0.3); }
-    .mqtt-status { text-align: center; font-size: 14px; font-weight: bold; margin-bottom: 25px; color: var(--neon-red); }
+    * { box-sizing: border-box; }
+    html, body { font-family: 'Segoe UI', Arial, sans-serif; background-color: var(--bg-color); color: var(--text-main); margin: 0; padding: 0; }
+    .container { max-width: 760px; margin: 0 auto; padding: 14px 12px 28px; }
+    h1 { text-align: center; color: var(--neon-cyan); font-size: clamp(17px, 5vw, 24px); letter-spacing: 1.5px; text-transform: uppercase; margin: 6px 0 4px; text-shadow: 0 0 10px rgba(0, 240, 255, 0.3); }
+    .mqtt-status { text-align: center; font-size: 13px; font-weight: bold; margin-bottom: 16px; color: var(--neon-red); }
     .mqtt-status.connected { color: var(--neon-green); }
 
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-bottom: 20px; }
-    .card { background: var(--card-bg); padding: 18px; border-radius: 12px; border: 1px solid #1f2a45; box-shadow: 0 4px 15px rgba(0,0,0,0.3); position: relative; overflow: hidden; transition: all 0.3s; }
-    .card:hover { border-color: var(--neon-cyan); box-shadow: 0 0 15px rgba(0, 240, 255, 0.2); }
+    /* Mỗi hàng là một lưới cố định 3 hoặc 2 cột, không xuống dòng */
+    .row { display: grid; gap: 10px; margin-bottom: 10px; }
+    .r3 { grid-template-columns: repeat(3, 1fr); }
+    .r2 { grid-template-columns: repeat(2, 1fr); }
+    .r1 { grid-template-columns: 1fr; }
+
+    .card { min-width: 0; background: var(--card-bg); padding: 12px 12px 12px 14px; border-radius: 12px; border: 1px solid var(--line); position: relative; overflow: hidden; }
     .card::before { content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: var(--neon-cyan); }
     .card.money::before { background: var(--neon-green); }
     .card.setting::before { background: var(--neon-orange); }
+    .card.energy::before { background: var(--neon-purple); }
 
-    .label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; font-weight: bold; letter-spacing: 1px; }
-    .value { font-size: 26px; font-weight: bold; margin-top: 8px; display: flex; align-items: baseline; font-variant-numeric: tabular-nums; }
-    .unit { font-size: 14px; color: var(--text-muted); font-weight: normal; margin-left: 5px; }
+    .label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: bold; letter-spacing: .5px; line-height: 1.3; }
+    .value { font-size: clamp(18px, 5.4vw, 26px); font-weight: bold; margin-top: 6px; display: flex; align-items: baseline; flex-wrap: wrap; font-variant-numeric: tabular-nums; }
+    .unit { font-size: 12px; color: var(--text-muted); font-weight: normal; margin-left: 4px; }
 
-    .chart-box { background: var(--card-bg); padding: 20px; border-radius: 12px; border: 1px solid #1f2a45; margin-bottom: 20px; height: 280px; }
-    .control-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-    @media (max-width: 600px) { .control-panel { grid-template-columns: 1fr; } }
+    /* Ô ghép: tần số | cos phi */
+    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+    .split > div:first-child { padding-right: 12px; border-right: 1px solid var(--line); }
+    .split > div:last-child { padding-left: 12px; }
 
-    .input-group { display: flex; flex-direction: column; gap: 8px; }
-    input[type=number] { background: #0a0f1d; border: 1px solid #1f2a45; padding: 10px; color: #fff; font-size: 16px; border-radius: 6px; text-align: center; outline: none; }
+    /* Cài đặt */
+    .set-cur { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+    .set-cur b { color: var(--text-main); }
+    .input-group { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+    input[type=number] { width: 100%; background: #0a0f1d; border: 1px solid var(--line); padding: 9px; color: #fff; font-size: 16px; border-radius: 6px; text-align: center; outline: none; }
     input[type=number]:focus { border-color: var(--neon-cyan); }
-    button { padding: 10px 15px; font-size: 15px; background: var(--neon-orange); color: #000; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s; }
-    button:hover { background: #ffaa22; box-shadow: 0 0 10px rgba(255,153,0,0.5); }
+    button { padding: 9px 8px; font-size: 14px; background: var(--neon-orange); color: #000; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
+    button:active { background: #ffaa22; }
+
+    .chart-box { background: var(--card-bg); padding: 14px; border-radius: 12px; border: 1px solid var(--line); height: 270px; margin-top: 4px; }
   </style>
 </head>
 <body>
 <div class="container">
-  <h1>⚡ CYBERPUNK ENERGY DASHBOARD</h1>
+  <h1>⚡ Giám Sát Điện Năng</h1>
   <div id="mqtt-info" class="mqtt-status">🔴 ĐANG KẾT NỐI BROKER MQTT...</div>
 
-  <div class="grid">
-    <div class="card"><div class="label">Điện Áp</div><div class="value" id="v">0<span class="unit">V</span></div></div>
-    <div class="card"><div class="label">Dòng Điện</div><div class="value" id="a">0<span class="unit">A</span></div></div>
-    <div class="card"><div class="label">Công Suất</div><div class="value" id="w">0<span class="unit">W</span></div></div>
-    <div class="card"><div class="label">Tần Số</div><div class="value" id="hz">0<span class="unit">Hz</span></div></div>
-    <div class="card"><div class="label">Hệ Số Cos Phi</div><div class="value" id="pf">0<span class="unit"></span></div></div>
-    <div class="card"><div class="label">Điện Năng Hôm Nay</div><div class="value" id="kwh_hn">0<span class="unit">kWh</span></div></div>
-    <div class="card"><div class="label">Điện Năng Hôm Qua</div><div class="value" id="kwh_hq">0<span class="unit">kWh</span></div></div>
-    <div class="card"><div class="label">Điện Năng Tháng Này</div><div class="value" id="kwh_tn">0<span class="unit">kWh</span></div></div>
-    <div class="card"><div class="label">Điện Năng Tháng Trước</div><div class="value" id="kwh_tt">0<span class="unit">kWh</span></div></div>
-    <div class="card money"><div class="label">💰 TIỀN ĐIỆN THÁNG NÀY</div><div class="value" id="tien_tn" style="color:var(--neon-green);">0<span class="unit">đ</span></div></div>
-    <div class="card money"><div class="label">🗓️ TIỀN ĐIỆN THÁNG TRƯỚC</div><div class="value" id="tien_tt" style="color:#b559ff;">0<span class="unit">đ</span></div></div>
+  <!-- Hàng 1: Điện áp - Dòng điện - Công suất -->
+  <div class="row r3">
+    <div class="card"><div class="label">Điện áp</div><div class="value" id="v">0<span class="unit">V</span></div></div>
+    <div class="card"><div class="label">Dòng điện</div><div class="value" id="a">0<span class="unit">A</span></div></div>
+    <div class="card"><div class="label">Công suất</div><div class="value" id="w">0<span class="unit">W</span></div></div>
   </div>
 
+  <!-- Hàng 2: Tần số + Cos phi trong 1 ô -->
+  <div class="row r1">
+    <div class="card">
+      <div class="split">
+        <div><div class="label">Tần số</div><div class="value" id="hz">0<span class="unit">Hz</span></div></div>
+        <div><div class="label">Hệ số cos phi</div><div class="value" id="pf">0</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hàng 3: Điện năng hôm nay - hôm qua -->
+  <div class="row r2">
+    <div class="card energy"><div class="label">Điện năng hôm nay</div><div class="value" id="kwh_hn">0<span class="unit">kWh</span></div></div>
+    <div class="card energy"><div class="label">Điện năng hôm qua</div><div class="value" id="kwh_hq">0<span class="unit">kWh</span></div></div>
+  </div>
+
+  <!-- Hàng 4: Điện năng tháng này - tháng trước -->
+  <div class="row r2">
+    <div class="card energy"><div class="label">Điện năng tháng này</div><div class="value" id="kwh_tn">0<span class="unit">kWh</span></div></div>
+    <div class="card energy"><div class="label">Điện năng tháng trước</div><div class="value" id="kwh_tt">0<span class="unit">kWh</span></div></div>
+  </div>
+
+  <!-- Hàng 5: Tiền điện tháng này - tháng trước -->
+  <div class="row r2">
+    <div class="card money"><div class="label">💰 Tiền điện tháng này</div><div class="value" id="tien_tn" style="color:var(--neon-green);">0<span class="unit">đ</span></div></div>
+    <div class="card money"><div class="label">🗓️ Tiền điện tháng trước</div><div class="value" id="tien_tt" style="color:var(--neon-purple);">0<span class="unit">đ</span></div></div>
+  </div>
+
+  <!-- Hàng 6: Cài ngày chốt sổ - Cài đơn giá -->
+  <div class="row r2">
+    <div class="card setting">
+      <div class="label" style="color:var(--neon-orange);">📅 Ngày chốt sổ</div>
+      <div class="set-cur">Hiện tại: <b id="lbl_ngay">--</b></div>
+      <div class="input-group">
+        <input type="number" id="input_ngay" min="1" max="28" value="2">
+        <button onclick="publishSetting('set_ngaychot', 'input_ngay')">Cập nhật ngày</button>
+      </div>
+    </div>
+    <div class="card setting">
+      <div class="label" style="color:var(--neon-orange);">💰 Đơn giá điện</div>
+      <div class="set-cur">Hiện tại: <b id="lbl_gia">--</b> đ</div>
+      <div class="input-group">
+        <input type="number" id="input_gia" value="3500">
+        <button onclick="publishSetting('set_dongia', 'input_gia')">Cập nhật đơn giá</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hàng cuối: Biểu đồ -->
   <div class="chart-box">
     <canvas id="realtimeChart"></canvas>
-  </div>
-
-  <div class="control-panel">
-    <div class="card setting">
-      <div class="label" style="color:var(--neon-orange);">📅 CÀI NGÀY CHỐT SỔ (Hiện tại: <span id="lbl_ngay">--</span>)</div>
-      <div class="input-group" style="margin-top:10px;">
-        <input type="number" id="input_ngay" min="1" max="28" value="2">
-        <button onclick="publishSetting('set_ngaychot', 'input_ngay')">Cập nhật Ngày</button>
-      </div>
-    </div>
-    <div class="card setting">
-      <div class="label" style="color:var(--neon-orange);">💰 CÀI ĐƠN GIÁ ĐIỆN (Hiện tại: <span id="lbl_gia">--</span> đ)</div>
-      <div class="input-group" style="margin-top:10px;">
-        <input type="number" id="input_gia" value="3500">
-        <button onclick="publishSetting('set_dongia', 'input_gia')">Cập nhật Đơn Giá</button>
-      </div>
-    </div>
   </div>
 </div>
 
