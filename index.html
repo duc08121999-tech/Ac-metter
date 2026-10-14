@@ -18,6 +18,7 @@
       --neon-orange: #ff9900;
       --neon-red: #ff3366;
       --neon-purple: #b559ff;
+      --neon-yellow: #ffd400;
     }
     * { box-sizing: border-box; }
     html, body { font-family: 'Segoe UI', Arial, sans-serif; background-color: var(--bg-color); color: var(--text-main); margin: 0; padding: 0; }
@@ -37,6 +38,7 @@
     .card.money::before { background: var(--neon-green); }
     .card.setting::before { background: var(--neon-orange); }
     .card.energy::before { background: var(--neon-purple); }
+    .card.total::before { background: var(--neon-yellow); }
 
     .label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: bold; letter-spacing: .5px; line-height: 1.3; }
     .value { font-size: clamp(18px, 5.4vw, 26px); font-weight: bold; margin-top: 6px; display: flex; align-items: baseline; flex-wrap: wrap; font-variant-numeric: tabular-nums; }
@@ -104,6 +106,11 @@
     <div class="card money"><div class="label">🗓️ Tiền điện tháng trước</div><div class="value" id="tien_tt" style="color:var(--neon-purple);">0<span class="unit">đ</span></div></div>
   </div>
 
+  <!-- Tổng chỉ số công tơ (nằm trên hàng cài đặt) -->
+  <div class="row r1">
+    <div class="card total"><div class="label">⚡ Tổng chỉ số công tơ</div><div class="value" id="kwh_tong" style="color:var(--neon-yellow);">0<span class="unit">kWh</span></div></div>
+  </div>
+
   <!-- Hàng 6: Cài ngày chốt sổ - Cài đơn giá -->
   <div class="row r2">
     <div class="card setting">
@@ -143,9 +150,9 @@
   const MQTT_PORT   = USE_SSL ? 8884 : 8000;
   const MQTT_PATH   = "/mqtt";              // HiveMQ bắt buộc đường dẫn /mqtt
 
-  // Tiền tố topic: PHẢI trùng với ESP32. Nên đổi thành chuỗi riêng của bạn
-  // (ví dụ "pzem_nhatoi_8841") vì broker công cộng ai cũng đọc/ghi được.
-  const TOPIC_PREFIX = "pzem";
+  // Tiền tố topic: PHẢI trùng với MQTT_PREFIX trong code ESP32.
+  // Broker công cộng ai cũng đọc/ghi được nên dùng chuỗi riêng, không dùng "pzem" chung.
+  const TOPIC_PREFIX = "pzem_8f3k2x";
 
   const CLIENT_ID = "Web_Dashboard_" + Math.random().toString(16).substr(2, 8);
 
@@ -280,6 +287,7 @@
       case "kwh_homqua":      setValue("kwh_hq", payload, "kWh"); break;
       case "kwh_thangnay":    setValue("kwh_tn", payload, "kWh"); break;
       case "kwh_thangtruoc":  setValue("kwh_tt", payload, "kWh"); break;
+      case "kwh_tong":        setValue("kwh_tong", payload, "kWh"); break;
       case "tien_thangnay":   setValue("tien_tn", payload, "đ", true); break;
       case "tien_thangtruoc": setValue("tien_tt", payload, "đ", true); break;
       case "status_ngaychot": document.getElementById("lbl_ngay").innerText = payload; break;
