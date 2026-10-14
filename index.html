@@ -106,8 +106,42 @@
     infoEl.innerHTML = text;
     infoEl.className = "mqtt-status" + (ok ? " connected" : "");
   }
-  function setValue(id, text, unit) {
+  // Cập nhật số có hiệu ứng chuyển mượt (0.4 giây), gom vào một vòng vẽ chung
+  const anim = {};
+  let animRunning = false;
+  function render(id, text, unit) {
     document.getElementById(id).innerHTML = text + (unit ? '<span class="unit">' + unit + '</span>' : '');
+  }
+  function setValue(id, raw, unit, money) {
+    const target = Number(raw);
+    if (raw === "" || isNaN(target)) { render(id, raw, unit); return; }
+    const old = anim[id];
+    if (old && old.target === target) return;           // không đổi thì bỏ qua
+    anim[id] = {
+      from: old ? old.cur : target,
+      cur: old ? old.cur : target,
+      target: target,
+      start: performance.now(),
+      unit: unit,
+      money: !!money,
+      dec: money ? 0 : ((String(raw).split(".")[1] || "").length)
+    };
+    if (!animRunning) { animRunning = true; requestAnimationFrame(frame); }
+  }
+  function frame(now) {
+    let active = false;
+    for (const id in anim) {
+      const a = anim[id];
+      const t = Math.min(1, (now - a.start) / 400);
+      const e = 1 - Math.pow(1 - t, 3);                 // easeOutCubic
+      a.cur = a.from + (a.target - a.from) * e;
+      const txt = a.money
+        ? Math.round(a.cur).toLocaleString("vi-VN")
+        : a.cur.toFixed(a.dec);
+      render(id, txt, a.unit);
+      if (t < 1) active = true;
+    }
+    if (active) requestAnimationFrame(frame); else animRunning = false;
   }
 
   // Paho 1.0.1: Client(host, port, path, clientId)
@@ -167,7 +201,7 @@
       case "current":   setValue("a", payload, "A"); break;
       case "power":
         setValue("w", payload, "W");
-        updateChart(Number(payload));
+        latestPower = Number(payload);
         break;
       case "frequency": setValue("hz", payload, "Hz"); break;
       case "pf":        setValue("pf", payload, ""); break;
@@ -175,8 +209,8 @@
       case "kwh_homqua":      setValue("kwh_hq", payload, "kWh"); break;
       case "kwh_thangnay":    setValue("kwh_tn", payload, "kWh"); break;
       case "kwh_thangtruoc":  setValue("kwh_tt", payload, "kWh"); break;
-      case "tien_thangnay":   setValue("tien_tn", Number(payload).toLocaleString("vi-VN"), "đ"); break;
-      case "tien_thangtruoc": setValue("tien_tt", Number(payload).toLocaleString("vi-VN"), "đ"); break;
+      case "tien_thangnay":   setValue("tien_tn", payload, "đ", true); break;
+      case "tien_thangtruoc": setValue("tien_tt", payload, "đ", true); break;
       case "status_ngaychot": document.getElementById("lbl_ngay").innerText = payload; break;
       case "status_dongia":   document.getElementById("lbl_gia").innerText = Number(payload).toLocaleString("vi-VN"); break;
     }
@@ -196,7 +230,7 @@
 
   // ================= ĐỒ THỊ THỜI GIAN THỰC =================
   const ctx = document.getElementById("realtimeChart").getContext("2d");
-  const maxDataPoints = 15;
+  const maxDataPoints = 30;
   const realtimeChart = new Chart(ctx, {
     type: "line",
     data: {
@@ -217,18 +251,23 @@
       maintainAspectRatio: false,
       scales: {
         y: { grid: { color: "#1f2a45" }, ticks: { color: "#707e94" } },
-        x: { grid: { display: false } }
+        x: { grid: { display: false }, ticks: { color: "#707e94", maxTicksLimit: 5, maxRotation: 0 } }
       },
       plugins: { legend: { labels: { color: "#fff" } } }
     }
   });
 
-  function updateChart(newValue) {
-    if (isNaN(newValue)) return;
-    realtimeChart.data.datasets[0].data.push(newValue);
-    realtimeChart.data.datasets[0].data.shift();
+  // Mỗi giây thêm đúng 1 điểm (dùng giá trị công suất mới nhất) -> đồ thị chạy đều
+  let latestPower = null;
+  setInterval(function () {
+    if (latestPower === null || isNaN(latestPower)) return;
+    const d = realtimeChart.data;
+    d.datasets[0].data.push(latestPower);
+    d.datasets[0].data.shift();
+    d.labels.push(new Date().toLocaleTimeString("vi-VN"));
+    d.labels.shift();
     realtimeChart.update("none");
-  }
+  }, 1000);
 
   // Bắt đầu kết nối
   connectMQTT();
