@@ -202,21 +202,34 @@
   }
 
   // Paho 1.0.1: Client(host, port, path, clientId)
-  const client = new Paho.MQTT.Client(MQTT_BROKER, MQTT_PORT, MQTT_PATH, CLIENT_ID);
-  client.onConnectionLost = onConnectionLost;
-  client.onMessageArrived = onMessageArrived;
+  // Mỗi lần kết nối lại dùng một client MỚI để không dính lỗi "Invalid state already connected".
+  let client = null;
+  function newClient() {
+    const c = new Paho.MQTT.Client(MQTT_BROKER, MQTT_PORT, MQTT_PATH,
+      "Web_Dashboard_" + Math.random().toString(16).slice(2, 10));
+    c.onConnectionLost = function (resp) { if (c === client) onConnectionLost(resp); };
+    c.onMessageArrived = function (m) { if (c === client) onMessageArrived(m); };
+    return c;
+  }
+  client = newClient();
 
   let reconnectTimer = null;
   let connecting = false;
+  let connStart = 0, lastConnTime = 0, dropCount = 0, failCount = 0, lastLost = "";
 
   function connectMQTT() {
     if (connecting) return;
     connecting = true;
+    connStart = Date.now();
     setStatus("🔴 ĐANG KẾT NỐI BROKER MQTT...", false);
+    const c = client;
     try {
-      client.connect({
-        onSuccess: onConnect,
-        onFailure: onFailure,
+      c.connect({
+        onSuccess: function () {
+          if (c === client) onConnect();
+          else { try { c.disconnect(); } catch (e) {} }   // client cũ đã bị bỏ: đóng cho gọn
+        },
+        onFailure: function (err) { if (c === client) onFailure(err); },
         useSSL: USE_SSL,
         timeout: 6,
         keepAliveInterval: 30,
@@ -233,12 +246,15 @@
     if (reconnectTimer) return;
     reconnectTimer = setTimeout(function () {
       reconnectTimer = null;
+      if (client.isConnected() || connecting) return;   // đã nối được rồi thì thôi
+      client = newClient();                             // client mới, sạch trạng thái
       connectMQTT();
     }, 2000);
   }
 
   function onConnect() {
     connecting = false;
+    lastConnTime = Date.now() - connStart;
     gotData = false;
     setStatus("🟢 ĐÃ KẾT NỐI BROKER - ĐANG CHỜ DỮ LIỆU TỪ ESP32...", true);
     client.subscribe(TOPIC_PREFIX + "/#");
@@ -246,11 +262,14 @@
 
   function onFailure(err) {
     connecting = false;
+    failCount++;
     setStatus("🔴 KẾT NỐI THẤT BẠI: " + (err.errorMessage || err.errorCode) + " - thử lại sau 2 giây", false);
     scheduleReconnect();
   }
 
   function onConnectionLost(resp) {
+    dropCount++;
+    lastLost = (resp && resp.errorMessage) ? String(resp.errorMessage).slice(0, 60) : "";
     setStatus("🔴 MẤT KẾT NỐI MQTT, ĐANG THỬ LẠI...", false);
     scheduleReconnect();
   }
@@ -258,7 +277,8 @@
   // Nhận dữ liệu từ ESP32 và đẩy lên giao diện
   let gotData = false;
   const cache = {};
-  let lastMsg = 0, lastPow = 0, lastVol = 0, avgInt = 0;   // đo độ trễ và chu kỳ dữ liệu từ ESP32
+  let lastMsg = 0, lastPow = 0, lastVol = 0;
+  const powTimes = [];   // thời điểm các tin công suất đã nhận   // đo độ trễ và chu kỳ dữ liệu từ ESP32
   function onMessageArrived(message) {
     const topic = message.destinationName.replace(TOPIC_PREFIX + "/", "");
     const payload = message.payloadString;
@@ -268,8 +288,8 @@
     lastMsg = nowMs;
     if (topic === "voltage") lastVol = nowMs;
     if (topic === "power") {
-      if (lastPow) { const d = nowMs - lastPow; avgInt = avgInt ? avgInt * 0.7 + d * 0.3 : d; }
       lastPow = nowMs;
+      powTimes.push(nowMs);
     }
     handleTopic(topic, payload);
   }
@@ -453,7 +473,7 @@
       if (headP) {
         ctx.fillStyle = COL_P; ctx.fillText(smoothP.toFixed(1) + " W", rx, 12);
       }
-      if (!headP && !headU && (lastPow > 0 || lastVol > 0)) {
+      if (!headP && !headU && (lastPow > 0 || lastVol > 0) && nowMs - Math.max(lastPow, lastVol) > 15000) {
         ctx.fillStyle = "#ff9900"; ctx.fillText("Mất tín hiệu từ ESP32", W, 12);
       }
 
@@ -553,28 +573,39 @@
   // Hiển thị: dữ liệu mới nhất cách bao lâu, ESP32 gửi mỗi bao lâu
   setInterval(function () {
     const el = document.getElementById("age");
-    if (!lastMsg) { el.textContent = ""; return; }
-    const ago = (Date.now() - lastMsg) / 1000;
-    let t = "Dữ liệu mới nhất: " + ago.toFixed(1) + " giây trước";
-    if (avgInt) t += " · ESP32 gửi mỗi ~" + (avgInt / 1000).toFixed(1) + " giây";
-    el.textContent = t;
+    let a = "";
+    if (lastMsg) {
+      const nowT = Date.now();
+      while (powTimes.length && nowT - powTimes[0] > 60000) powTimes.shift();
+      a = "Dữ liệu mới nhất: " + ((nowT - lastMsg) / 1000).toFixed(1) + " giây trước" +
+          " · nhận " + powTimes.length + " tin công suất / 60 giây";
+    }
+    let b = "Kết nối lần cuối mất " + (lastConnTime ? (lastConnTime / 1000).toFixed(1) + " giây" : "--") +
+            " · rớt " + dropCount + " lần · lỗi " + failCount + " lần";
+    if (lastLost) b += " (" + lastLost + ")";
+    el.innerHTML = (a ? a + "<br>" : "") + b;
   }, 200);
 
-  // Quay lại trang / có mạng trở lại: nối lại ngay, không đợi chu kỳ tự thử lại
+  // Quay lại trang sau khi bị ẩn lâu / có mạng trở lại: nối lại ngay, không chờ chu kỳ tự thử
+  let hiddenAt = 0;
   function forceReconnect() {
-    if (connecting) return;
     if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
-    try { if (client.isConnected()) client.disconnect(); } catch (e) {}
-    setTimeout(connectMQTT, 150);
+    const old = client;
+    client = newClient();                 // bỏ hẳn client cũ, không dùng lại trạng thái cũ
+    connecting = false;
+    try { old.disconnect(); } catch (e) {}
+    connectMQTT();
   }
-  function wake() {
-    if (document.visibilityState === "hidden") return;
-    // đã rớt, hoặc kết nối còn nhưng 10 giây không có dữ liệu (thường do trình duyệt tạm ngưng trang)
-    if (!client.isConnected() || (lastMsg && Date.now() - lastMsg > 10000)) forceReconnect();
-  }
-  document.addEventListener("visibilitychange", wake);
-  window.addEventListener("pageshow", wake);
-  window.addEventListener("online", wake);
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "hidden") { hiddenAt = Date.now(); return; }
+    // điện thoại hay ngắt WebSocket ngầm khi ẩn trang: ẩn quá 15 giây thì nối lại cho chắc
+    if (hiddenAt && Date.now() - hiddenAt > 15000) forceReconnect();
+    else if (!client.isConnected() && !connecting) forceReconnect();
+    hiddenAt = 0;
+  });
+  window.addEventListener("online", function () {
+    if (!client.isConnected() && !connecting) forceReconnect();
+  });
 
   // Bắt đầu kết nối
   connectMQTT();
