@@ -26,6 +26,7 @@
     h1 { text-align: center; color: var(--neon-cyan); font-size: clamp(17px, 5vw, 24px); letter-spacing: 1.5px; text-transform: uppercase; margin: 6px 0 4px; text-shadow: 0 0 10px rgba(0, 240, 255, 0.3); }
     .mqtt-status { text-align: center; font-size: 13px; font-weight: bold; margin-bottom: 16px; color: var(--neon-red); }
     .mqtt-status.connected { color: var(--neon-green); }
+    .mqtt-status.warn { color: var(--neon-orange); }
 
     /* Mỗi hàng là một lưới cố định 3 hoặc 2 cột, không xuống dòng */
     .row { display: grid; gap: 10px; margin-bottom: 10px; }
@@ -80,7 +81,8 @@
 <div class="container">
   <h1>⚡ Giám Sát Điện Năng</h1>
   <div id="mqtt-info" class="mqtt-status">🔴 ĐANG KẾT NỐI BROKER MQTT...</div>
-  <div id="age" style="text-align:center;font-size:12px;color:var(--text-muted);margin:-10px 0 14px;"></div>
+  <div id="age" style="text-align:center;font-size:12px;color:var(--text-muted);margin:-10px 0 6px;"></div>
+  <div id="esp" style="text-align:center;font-size:12px;margin:0 0 14px;color:var(--text-muted);"></div>
 
   <!-- Hàng 1: Điện áp - Dòng điện - Công suất -->
   <div class="row r3">
@@ -193,7 +195,7 @@
   const infoEl = document.getElementById("mqtt-info");
   function setStatus(text, ok) {
     infoEl.innerHTML = text;
-    infoEl.className = "mqtt-status" + (ok ? " connected" : "");
+    infoEl.className = "mqtt-status" + (ok === true ? " connected" : (ok === "warn" ? " warn" : ""));
   }
   // Cập nhật số có hiệu ứng chuyển mượt (0.4 giây), gom vào một vòng vẽ chung
   const anim = {};
@@ -249,7 +251,7 @@
 
   let reconnectTimer = null;
   let connecting = false;
-  let connStart = 0, lastConnTime = 0, dropCount = 0, failCount = 0, lastLost = "";
+  let connStart = 0, lastConnTime = 0, dropCount = 0, failCount = 0, lastLost = "", retryMs = 2000;
 
   function connectMQTT() {
     if (connecting) return;
@@ -265,8 +267,8 @@
         },
         onFailure: function (err) { if (c === client) onFailure(err); },
         useSSL: USE_SSL,
-        timeout: 6,
-        keepAliveInterval: 30,
+        timeout: 12,
+        keepAliveInterval: 20,
         cleanSession: true
       });
     } catch (e) {
@@ -283,12 +285,15 @@
       if (client.isConnected() || connecting) return;   // đã nối được rồi thì thôi
       client = newClient();                             // client mới, sạch trạng thái
       connectMQTT();
-    }, 2000);
+    }, retryMs);
+    retryMs = Math.min(10000, Math.round(retryMs * 1.5));   // thử lại giãn dần: 2s, 3s, 4.5s ... tối đa 10s
   }
 
   function onConnect() {
     connecting = false;
     lastConnTime = Date.now() - connStart;
+    retryMs = 2000;
+    warned = false;
     gotData = false;
     setStatus("🟢 ĐÃ KẾT NỐI BROKER - ĐANG CHỜ DỮ LIỆU TỪ ESP32...", true);
     client.subscribe(TOPIC_PREFIX + "/#");
@@ -310,6 +315,8 @@
 
   // Nhận dữ liệu từ ESP32 và đẩy lên giao diện
   let gotData = false;
+  let warned = false;
+  let espState = "", espRssi = null, espUptime = null, espRecon = null;
   const cache = {};
   let lastMsg = 0, lastPow = 0, lastVol = 0;
   const powTimes = [];   // thời điểm các tin công suất đã nhận   // đo độ trễ và chu kỳ dữ liệu từ ESP32
@@ -317,6 +324,7 @@
     const topic = message.destinationName.replace(TOPIC_PREFIX + "/", "");
     const payload = message.payloadString;
     if (!gotData) { gotData = true; setStatus("🟢 ĐANG NHẬN DỮ LIỆU TRỰC TIẾP", true); }
+    else if (warned) { warned = false; setStatus("🟢 ĐANG NHẬN DỮ LIỆU TRỰC TIẾP", true); }
     cache[topic] = payload;
     const nowMs = Date.now();
     lastMsg = nowMs;
@@ -343,6 +351,10 @@
       case "kwh_thangnay":    setValue("kwh_tn", payload, "kWh"); break;
       case "kwh_thangtruoc":  setValue("kwh_tt", payload, "kWh"); break;
       case "kwh_tong":        setValue("kwh_tong", payload, "kWh"); break;
+      case "status":     if (live) { espState = payload; updateEsp(); } break;
+      case "rssi":       if (live) { espRssi = Number(payload); updateEsp(); } break;
+      case "uptime":     if (live) { espUptime = Number(payload); updateEsp(); } break;
+      case "reconnects": if (live) { espRecon = Number(payload); updateEsp(); } break;
       case "tien_thangnay":   setValue("tien_tn", payload, "đ", true); tienDien = Number(payload) || 0; updateCalc(); if (live) { tienNow = Number(payload); syncMonths(); } break;
       case "tien_thangtruoc": setValue("tien_tt", payload, "đ", true); if (live) { tienPrev = Number(payload); syncMonths(); } break;
       case "status_ngaychot": document.getElementById("lbl_ngay").innerText = payload; chotDay = Number(payload) || 0; if (live) syncMonths(); drawMonths(); break;
@@ -818,6 +830,46 @@
   window.addEventListener("online", function () {
     if (!client.isConnected() && !connecting) forceReconnect();
   });
+
+  // ---- trạng thái ESP32 (sóng WiFi, thời gian chạy, số lần nối lại MQTT) ----
+  function fmtDur(sec) {
+    if (sec < 60) return Math.round(sec) + " giây";
+    if (sec < 3600) return Math.floor(sec / 60) + " phút";
+    if (sec < 86400) return Math.floor(sec / 3600) + " giờ " + Math.floor((sec % 3600) / 60) + " phút";
+    return Math.floor(sec / 86400) + " ngày " + Math.floor((sec % 86400) / 3600) + " giờ";
+  }
+  function updateEsp() {
+    const el = document.getElementById("esp");
+    if (!espState) { el.textContent = ""; return; }
+    if (espState !== "online") {
+      el.style.color = "#ff3366";
+      el.textContent = "🔴 ESP32 đang NGOẠI TUYẾN (mất kết nối với broker)";
+      return;
+    }
+    const parts = ["🟢 ESP32 trực tuyến"];
+    if (espRssi !== null && !isNaN(espRssi)) {
+      parts.push("WiFi " + espRssi + " dBm (" + (espRssi > -60 ? "tốt" : espRssi > -75 ? "trung bình" : "yếu") + ")");
+    }
+    if (espUptime !== null && !isNaN(espUptime)) parts.push("chạy " + fmtDur(espUptime));
+    if (espRecon !== null && !isNaN(espRecon)) parts.push("nối lại MQTT " + Math.max(0, espRecon - 1) + " lần");
+    el.style.color = "#7ddc9a";
+    el.textContent = parts.join(" · ");
+  }
+
+  // ---- giám sát: đang "kết nối" mà không có dữ liệu thì nói rõ và tự nối lại ----
+  let lastForce = 0;
+  setInterval(function () {
+    if (!client.isConnected() || connecting || !lastMsg) return;
+    const now = Date.now(), silent = now - lastMsg;
+    if (silent <= 15000) return;
+    warned = true;
+    if (espState === "offline") {
+      setStatus("🟠 ĐÃ KẾT NỐI BROKER - ESP32 ĐANG NGOẠI TUYẾN", "warn");
+      return;                                        // ESP32 tắt/mất mạng: nối lại phía web cũng vô ích
+    }
+    setStatus("🟠 ĐÃ KẾT NỐI NHƯNG KHÔNG CÓ DỮ LIỆU (" + Math.round(silent / 1000) + " giây)", "warn");
+    if (silent > 30000 && now - lastForce > 45000) { lastForce = now; forceReconnect(); }   // kết nối "treo ngầm" trên mạng di động
+  }, 3000);
 
   // Bắt đầu kết nối
   connectMQTT();
