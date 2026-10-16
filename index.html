@@ -60,6 +60,17 @@
 
     .chart-box { background: var(--card-bg); padding: 14px; border-radius: 12px; border: 1px solid var(--line); height: 300px; margin-top: 4px; overflow: hidden; }
     .chart-box canvas { display: block; }
+    .chart-box + .row { margin-top: 10px; }
+    .month-box { background: var(--card-bg); padding: 14px; border-radius: 12px; border: 1px solid var(--line); height: 260px; overflow: hidden; }
+    .month-box canvas { display: block; }
+    .card.calc::before { background: var(--neon-green); }
+    .calc-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+    .calc-row small { display: block; color: var(--text-muted); font-size: 11px; }
+    .calc-row input { width: 52%; text-align: right; }
+    .calc-row b { color: var(--neon-green); font-size: 16px; font-variant-numeric: tabular-nums; }
+    .calc-total { display: flex; justify-content: space-between; align-items: baseline; padding-top: 12px; }
+    .calc-total span { font-weight: 700; letter-spacing: .5px; }
+    .calc-total b { color: var(--neon-yellow); font-size: 24px; font-variant-numeric: tabular-nums; }
     .range { display: flex; gap: 6px; margin-bottom: 6px; }
     .range button { flex: 1; padding: 5px 0; font-size: 12px; background: transparent; color: var(--text-muted); border: 1px solid var(--line); border-radius: 6px; font-weight: 600; }
     .range button.on { color: #000; background: var(--neon-cyan); border-color: var(--neon-cyan); }
@@ -139,6 +150,25 @@
       <button data-w="3600000">1 giờ</button>
     </div>
     <canvas id="realtimeChart"></canvas>
+  </div>
+
+  <!-- Bảng tính tiền phòng tháng này -->
+  <div class="row r1">
+    <div class="card calc">
+      <div class="label" style="color:var(--neon-green);">🧾 Bảng tính tiền phòng tháng này</div>
+      <div class="calc-row"><span>Tiền trọ</span><input type="number" inputmode="numeric" id="c_tro" placeholder="0"></div>
+      <div class="calc-row"><span>Số nước<small>m³ đã dùng</small></span><input type="number" inputmode="decimal" step="any" id="c_m3" placeholder="0"></div>
+      <div class="calc-row"><span>Giá nước<small>đ cho 1 m³</small></span><input type="number" inputmode="numeric" id="c_gia" placeholder="0"></div>
+      <div class="calc-row"><span>Tiền nước<small>= số m³ × giá nước</small></span><b id="c_nuoc">0 đ</b></div>
+      <div class="calc-row"><span>Tiền điện<small>tháng này, tự lấy từ công tơ</small></span><b id="c_dien">0 đ</b></div>
+      <div class="calc-row"><span>Tiền khác</span><input type="number" inputmode="numeric" id="c_khac" placeholder="0"></div>
+      <div class="calc-total"><span>TỔNG CỘNG</span><b id="c_tong">0 đ</b></div>
+    </div>
+  </div>
+
+  <!-- Thống kê tiền điện các tháng (dưới cùng) -->
+  <div class="month-box">
+    <canvas id="monthChart"></canvas>
   </div>
 </div>
 
@@ -291,10 +321,10 @@
       lastPow = nowMs;
       powTimes.push(nowMs);
     }
-    handleTopic(topic, payload);
+    handleTopic(topic, payload, true);
   }
 
-  function handleTopic(topic, payload) {
+  function handleTopic(topic, payload, live) {
     switch (topic) {
       case "voltage":   setValue("v", payload, "V"); latestVoltage = Number(payload); break;
       case "current":   setValue("a", payload, "A"); break;
@@ -309,9 +339,9 @@
       case "kwh_thangnay":    setValue("kwh_tn", payload, "kWh"); break;
       case "kwh_thangtruoc":  setValue("kwh_tt", payload, "kWh"); break;
       case "kwh_tong":        setValue("kwh_tong", payload, "kWh"); break;
-      case "tien_thangnay":   setValue("tien_tn", payload, "đ", true); break;
-      case "tien_thangtruoc": setValue("tien_tt", payload, "đ", true); break;
-      case "status_ngaychot": document.getElementById("lbl_ngay").innerText = payload; break;
+      case "tien_thangnay":   setValue("tien_tn", payload, "đ", true); tienDien = Number(payload) || 0; updateCalc(); if (live) { tienNow = Number(payload); syncMonths(); } break;
+      case "tien_thangtruoc": setValue("tien_tt", payload, "đ", true); if (live) { tienPrev = Number(payload); syncMonths(); } break;
+      case "status_ngaychot": document.getElementById("lbl_ngay").innerText = payload; chotDay = Number(payload) || 0; if (live) syncMonths(); drawMonths(); break;
       case "status_dongia":   document.getElementById("lbl_gia").innerText = Number(payload).toLocaleString("vi-VN"); break;
     }
   }
@@ -556,6 +586,170 @@
     }
     requestAnimationFrame(draw);
   })();
+
+  // ================= THỐNG KÊ TIỀN ĐIỆN CÁC THÁNG + BẢNG TÍNH TIỀN PHÒNG =================
+  const MKEY = "pzem_months_" + TOPIC_PREFIX;
+  const CKEY = "pzem_calc_" + TOPIC_PREFIX;
+  let chotDay = 0, tienNow = null, tienPrev = null, tienDien = 0, selKey = null;
+  let monthHist = {};      // {"2026-10": 42091, ...} lưu trong trình duyệt
+  try { monthHist = JSON.parse(localStorage.getItem(MKEY) || "{}") || {}; } catch (err) { monthHist = {}; }
+
+  function keyOf(y, m) { return y + "-" + String(m + 1).padStart(2, "0"); }   // m: 0-11
+  // kỳ tiền điện hiện tại tính theo ngày chốt sổ (trước ngày chốt vẫn thuộc kỳ tháng trước)
+  function periodKey(d, chot) {
+    let y = d.getFullYear(), m = d.getMonth();
+    if (chot > 1 && d.getDate() < chot) { m--; if (m < 0) { m = 11; y--; } }
+    return keyOf(y, m);
+  }
+  function shiftKey(key, delta) {
+    let y = Number(key.slice(0, 4)), m = Number(key.slice(5, 7)) - 1 + delta;
+    while (m < 0) { m += 12; y--; }
+    while (m > 11) { m -= 12; y++; }
+    return keyOf(y, m);
+  }
+
+  // ghi nhận tiền điện của kỳ này và kỳ trước từ dữ liệu trực tiếp của ESP32
+  function syncMonths() {
+    if (!chotDay) return;                       // chưa biết ngày chốt thì chưa xếp được tháng
+    const cur = periodKey(new Date(), chotDay);
+    let changed = false;
+    if (tienNow !== null && !isNaN(tienNow) && monthHist[cur] !== tienNow) { monthHist[cur] = tienNow; changed = true; }
+    if (tienPrev !== null && !isNaN(tienPrev) && tienPrev > 0) {
+      const pk = shiftKey(cur, -1);
+      if (monthHist[pk] !== tienPrev) { monthHist[pk] = tienPrev; changed = true; }
+    }
+    if (!changed) return;
+    const ks = Object.keys(monthHist).sort();
+    while (ks.length > 36) delete monthHist[ks.shift()];
+    try { localStorage.setItem(MKEY, JSON.stringify(monthHist)); } catch (err) {}
+    drawMonths();
+  }
+
+  function fmtShort(v) {
+    if (v >= 1e6) return (v / 1e6).toFixed(v >= 1e7 ? 0 : 1).replace(".", ",") + "tr";
+    if (v >= 1000) return Math.round(v / 1000) + "k";
+    return String(Math.round(v));
+  }
+  const fmtMoney = n => Math.round(n).toLocaleString("vi-VN") + " đ";
+
+  const mCanvas = document.getElementById("monthChart");
+  const mctx = mCanvas.getContext("2d");
+  let mBars = [];
+  function drawMonths() {
+    const box = mCanvas.parentElement;
+    const dpr = window.devicePixelRatio || 1;
+    const W = box.clientWidth - 28, H = box.clientHeight - 28;
+    if (W <= 0 || H <= 0) return;
+    mCanvas.style.width = W + "px";
+    mCanvas.style.height = H + "px";
+    mCanvas.width = Math.round(W * dpr);
+    mCanvas.height = Math.round(H * dpr);
+    mctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    mctx.clearRect(0, 0, W, H);
+    mctx.font = "11px 'Segoe UI', Arial, sans-serif";
+    mBars = [];
+
+    // danh sách các tháng hiển thị: từ tháng có dữ liệu sớm nhất đến kỳ hiện tại (tối thiểu 6, tối đa 12 cột)
+    const cur = periodKey(new Date(), chotDay || 1);
+    const have = Object.keys(monthHist).filter(k => k <= cur).sort();
+    let n = 6;
+    if (have.length) {
+      const e = have[0];
+      const span = (Number(cur.slice(0, 4)) - Number(e.slice(0, 4))) * 12 + Number(cur.slice(5, 7)) - Number(e.slice(5, 7)) + 1;
+      n = Math.min(12, Math.max(6, span));
+    }
+    const keys = [];
+    for (let i = n - 1; i >= 0; i--) keys.push(shiftKey(cur, -i));
+    const vals = keys.map(k => (monthHist[k] === undefined ? null : monthHist[k]));
+    const present = vals.filter(v => v !== null);
+
+    // tiêu đề, trung bình hoặc giá trị cột đang chọn
+    mctx.textAlign = "left";
+    mctx.fillStyle = "#ffffff";
+    mctx.fillText("Tiền điện các tháng (đ)", 0, 12);
+    mctx.textAlign = "right";
+    if (selKey && monthHist[selKey] !== undefined) {
+      mctx.fillStyle = "#ffd400";
+      mctx.fillText("T" + Number(selKey.slice(5)) + "/" + selKey.slice(0, 4) + ": " + fmtMoney(monthHist[selKey]), W, 12);
+    } else if (present.length) {
+      const avg = present.reduce((a, b) => a + b, 0) / present.length;
+      mctx.fillStyle = "#707e94";
+      mctx.fillText("Trung bình: " + fmtShort(avg) + "/tháng", W, 12);
+    }
+
+    const x0 = 34, x1 = W - 4, y0 = 28, y1 = H - 20;
+    let top = 1000;
+    for (const v of present) if (v > top) top = v;
+    top *= 1.25;
+
+    // lưới ngang + nhãn trục
+    mctx.strokeStyle = "#1f2a45";
+    mctx.lineWidth = 1;
+    for (let i = 0; i <= 4; i++) {
+      const y = y1 - (y1 - y0) * i / 4;
+      mctx.beginPath(); mctx.moveTo(x0, y); mctx.lineTo(x1, y); mctx.stroke();
+      mctx.fillStyle = "#707e94"; mctx.textAlign = "right";
+      mctx.fillText(fmtShort(top * i / 4), x0 - 5, y + 4);
+    }
+
+    if (!present.length) {
+      mctx.fillStyle = "#707e94";
+      mctx.textAlign = "center";
+      mctx.fillText("Chưa có dữ liệu - sẽ tự ghi nhận khi trang nhận tiền điện từ ESP32", (x0 + x1) / 2, (y0 + y1) / 2);
+      return;
+    }
+
+    // các cột
+    const sw = (x1 - x0) / keys.length, bw = Math.min(34, sw * 0.62);
+    keys.forEach(function (k, i) {
+      const cx = x0 + sw * (i + 0.5);
+      const isCur = k === cur;
+      mctx.fillStyle = "#707e94"; mctx.textAlign = "center";
+      mctx.fillText(Number(k.slice(5)) + "/" + k.slice(2, 4), cx, H - 5);
+      mBars.push({ x0: cx - sw / 2, x1: cx + sw / 2, key: k });
+      const v = vals[i];
+      if (v === null) return;
+      const h = Math.max(2, (v / top) * (y1 - y0));
+      mctx.fillStyle = isCur ? "#00ff66" : "#b559ff";
+      mctx.fillRect(cx - bw / 2, y1 - h, bw, h);
+      if (k === selKey) { mctx.strokeStyle = "#ffffff"; mctx.lineWidth = 1.5; mctx.strokeRect(cx - bw / 2, y1 - h, bw, h); }
+      mctx.fillStyle = "#ffffff"; mctx.textAlign = "center";
+      mctx.fillText(fmtShort(v), cx, y1 - h - 4);
+    });
+  }
+  mCanvas.addEventListener("click", function (ev) {
+    const x = ev.clientX - mCanvas.getBoundingClientRect().left;
+    const hit = mBars.find(b => x >= b.x0 && x <= b.x1);
+    selKey = (hit && hit.key !== selKey) ? hit.key : null;
+    drawMonths();
+  });
+  window.addEventListener("resize", drawMonths);
+
+  // ---- bảng tính tiền phòng: nhập tay trọ, nước, khác; tiền điện tự lấy; tổng tự cộng ----
+  const calcIds = ["c_tro", "c_m3", "c_gia", "c_khac"];
+  function updateCalc() {
+    const g = id => Math.max(0, Number(document.getElementById(id).value) || 0);
+    const nuoc = Math.round(g("c_m3") * g("c_gia"));          // tiền nước = số m³ × giá 1 m³
+    document.getElementById("c_nuoc").textContent = fmtMoney(nuoc);
+    document.getElementById("c_dien").textContent = fmtMoney(tienDien);
+    document.getElementById("c_tong").textContent = fmtMoney(g("c_tro") + nuoc + g("c_khac") + tienDien);
+  }
+  calcIds.forEach(function (id) {
+    document.getElementById(id).addEventListener("input", function () {
+      updateCalc();
+      try {
+        const o = {};
+        calcIds.forEach(i => { o[i] = document.getElementById(i).value; });
+        localStorage.setItem(CKEY, JSON.stringify(o));
+      } catch (err) {}
+    });
+  });
+  try {
+    const o = JSON.parse(localStorage.getItem(CKEY) || "{}");
+    calcIds.forEach(i => { if (o[i] !== undefined) document.getElementById(i).value = o[i]; });
+  } catch (err) {}
+  updateCalc();
+  drawMonths();
 
   // Hiện ngay số liệu lần trước (nếu có) trong lúc chờ kết nối, số mới tới sẽ thay thế
   const CACHE_KEY = "pzem_cache_" + TOPIC_PREFIX;
