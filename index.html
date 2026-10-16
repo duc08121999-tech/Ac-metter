@@ -61,7 +61,7 @@
     .chart-box { background: var(--card-bg); padding: 14px; border-radius: 12px; border: 1px solid var(--line); height: 300px; margin-top: 4px; overflow: hidden; }
     .chart-box canvas { display: block; }
     .chart-box + .row { margin-top: 10px; }
-    .month-box { background: var(--card-bg); padding: 14px; border-radius: 12px; border: 1px solid var(--line); height: 260px; overflow: hidden; }
+    .month-box { background: var(--card-bg); padding: 14px; border-radius: 12px; border: 1px solid var(--line); height: 300px; overflow: hidden; }
     .month-box canvas { display: block; }
     .card.calc::before { background: var(--neon-green); }
     .calc-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
@@ -168,6 +168,10 @@
 
   <!-- Thống kê tiền điện các tháng (dưới cùng) -->
   <div class="month-box">
+    <div class="range" id="mrange">
+      <button data-n="6">6 tháng</button>
+      <button data-n="12">12 tháng</button>
+    </div>
     <canvas id="monthChart"></canvas>
   </div>
 </div>
@@ -634,11 +638,28 @@
 
   const mCanvas = document.getElementById("monthChart");
   const mctx = mCanvas.getContext("2d");
+  const NKEY = "pzem_monthn_" + TOPIC_PREFIX;
+  let monthN = 6;                       // số tháng hiển thị: 6 hoặc 12
+  try { const v = Number(localStorage.getItem(NKEY)); if (v === 6 || v === 12) monthN = v; } catch (err) {}
+  const mrangeEl = document.getElementById("mrange");
+  function markMonthRange() {
+    mrangeEl.querySelectorAll("button").forEach(b => b.classList.toggle("on", Number(b.dataset.n) === monthN));
+  }
+  mrangeEl.addEventListener("click", function (ev) {
+    const b = ev.target.closest("button");
+    if (!b) return;
+    monthN = Number(b.dataset.n);
+    try { localStorage.setItem(NKEY, String(monthN)); } catch (err) {}
+    selKey = null;
+    markMonthRange();
+    drawMonths();
+  });
+  markMonthRange();
   let mBars = [];
   function drawMonths() {
     const box = mCanvas.parentElement;
     const dpr = window.devicePixelRatio || 1;
-    const W = box.clientWidth - 28, H = box.clientHeight - 28;
+    const W = box.clientWidth - 28, H = box.clientHeight - 28 - mrangeEl.offsetHeight - 6;
     if (W <= 0 || H <= 0) return;
     mCanvas.style.width = W + "px";
     mCanvas.style.height = H + "px";
@@ -649,15 +670,9 @@
     mctx.font = "11px 'Segoe UI', Arial, sans-serif";
     mBars = [];
 
-    // danh sách các tháng hiển thị: từ tháng có dữ liệu sớm nhất đến kỳ hiện tại (tối thiểu 6, tối đa 12 cột)
+    // các tháng hiển thị: monthN tháng kết thúc ở kỳ hiện tại (tháng chưa có dữ liệu để trống)
     const cur = periodKey(new Date(), chotDay || 1);
-    const have = Object.keys(monthHist).filter(k => k <= cur).sort();
-    let n = 6;
-    if (have.length) {
-      const e = have[0];
-      const span = (Number(cur.slice(0, 4)) - Number(e.slice(0, 4))) * 12 + Number(cur.slice(5, 7)) - Number(e.slice(5, 7)) + 1;
-      n = Math.min(12, Math.max(6, span));
-    }
+    const n = monthN;
     const keys = [];
     for (let i = n - 1; i >= 0; i--) keys.push(shiftKey(cur, -i));
     const vals = keys.map(k => (monthHist[k] === undefined ? null : monthHist[k]));
@@ -701,11 +716,14 @@
 
     // các cột
     const sw = (x1 - x0) / keys.length, bw = Math.min(34, sw * 0.62);
+    mctx.font = (n > 6 ? "10px" : "11px") + " 'Segoe UI', Arial, sans-serif";
     keys.forEach(function (k, i) {
       const cx = x0 + sw * (i + 0.5);
       const isCur = k === cur;
       mctx.fillStyle = "#707e94"; mctx.textAlign = "center";
-      mctx.fillText(Number(k.slice(5)) + "/" + k.slice(2, 4), cx, H - 5);
+      const mm = Number(k.slice(5));
+      // 12 cột: chỉ ghi số tháng, kèm năm ở cột đầu và tháng 1 cho đỡ chật
+      mctx.fillText((n > 6 && i !== 0 && mm !== 1) ? String(mm) : mm + "/" + k.slice(2, 4), cx, H - 5);
       mBars.push({ x0: cx - sw / 2, x1: cx + sw / 2, key: k });
       const v = vals[i];
       if (v === null) return;
