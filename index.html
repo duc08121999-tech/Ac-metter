@@ -414,8 +414,8 @@
       const nowMs = Date.now();
 
       // chỉ ghi điểm khi ESP32 đang gửi dữ liệu mới
-      const freshP = lastPow > 0 && (nowMs - lastPow) < 6000 && latestPower !== null && !isNaN(latestPower);
-      const freshU = lastVol > 0 && (nowMs - lastVol) < 6000 && latestVoltage !== null && !isNaN(latestVoltage);
+      const freshP = lastPow > 0 && (nowMs - lastPow) < 3500 && latestPower !== null && !isNaN(latestPower);
+      const freshU = lastVol > 0 && (nowMs - lastVol) < 3500 && latestVoltage !== null && !isNaN(latestVoltage);
       if ((freshP || freshU) && nowMs - lastSample >= SAMPLE) {
         const reset = nowMs - lastSample > 3000;    // sau khoảng trống thì bắt đầu lại từ số mới
         if (freshP) smoothP = (smoothP === null || reset) ? latestPower : smoothP + (latestPower - smoothP) * 0.25;
