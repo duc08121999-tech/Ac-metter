@@ -316,13 +316,28 @@
   // Nhận dữ liệu từ ESP32 và đẩy lên giao diện
   let gotData = false;
   let warned = false;
-  let espState = "", espRssi = null, espUptime = null, espRecon = null;
+  let espState = "", espRssi = null, espUptime = null, espRecon = null, espHeap = null, espDrc = 0, espDup = 0, espDout = 0;
   const cache = {};
   let lastMsg = 0, lastPow = 0, lastVol = 0;
   const powTimes = [];   // thời điểm các tin công suất đã nhận   // đo độ trễ và chu kỳ dữ liệu từ ESP32
+  // tin gộp từ ESP32: "data" (mỗi giây) và "info" (mỗi 5 giây) -> quy về các trường quen thuộc
+  const MAP_DATA = { v: "voltage", a: "current", w: "power", hz: "frequency", pf: "pf" };
+  const MAP_INFO = { hn: "kwh_homnay", hq: "kwh_homqua", tn: "kwh_thangnay", tt: "kwh_thangtruoc", tong: "kwh_tong",
+                     dtn: "tien_thangnay", dtt: "tien_thangtruoc", ngay: "status_ngaychot", gia: "status_dongia",
+                     rssi: "rssi", up: "uptime", rc: "reconnects", heap: "heap", drc: "disc_rc", dup: "disc_up", dout: "disc_out" };
   function onMessageArrived(message) {
     const topic = message.destinationName.replace(TOPIC_PREFIX + "/", "");
-    const payload = message.payloadString;
+    if (topic === "data" || topic === "info") {
+      let obj = null;
+      try { obj = JSON.parse(message.payloadString); } catch (err) { return; }
+      if (!obj || typeof obj !== "object") return;       // tin rỗng/"null"/không phải JSON dạng đối tượng
+      const map = topic === "data" ? MAP_DATA : MAP_INFO;
+      for (const k in map) if (obj[k] !== undefined && obj[k] !== null) ingest(map[k], String(obj[k]));
+      return;
+    }
+    ingest(topic, message.payloadString);   // kiểu cũ: mỗi số một topic (vẫn đọc được)
+  }
+  function ingest(topic, payload) {
     if (!gotData) { gotData = true; setStatus("🟢 ĐANG NHẬN DỮ LIỆU TRỰC TIẾP", true); }
     else if (warned) { warned = false; setStatus("🟢 ĐANG NHẬN DỮ LIỆU TRỰC TIẾP", true); }
     cache[topic] = payload;
@@ -355,6 +370,10 @@
       case "rssi":       if (live) { espRssi = Number(payload); updateEsp(); } break;
       case "uptime":     if (live) { espUptime = Number(payload); updateEsp(); } break;
       case "reconnects": if (live) { espRecon = Number(payload); updateEsp(); } break;
+      case "heap":       if (live) { espHeap = Number(payload); updateEsp(); } break;
+      case "disc_rc":    if (live) { espDrc = Number(payload); updateEsp(); } break;
+      case "disc_up":    if (live) { espDup = Number(payload); updateEsp(); } break;
+      case "disc_out":   if (live) { espDout = Number(payload); updateEsp(); } break;
       case "tien_thangnay":   setValue("tien_tn", payload, "đ", true); tienDien = Number(payload) || 0; updateCalc(); if (live) { tienNow = Number(payload); syncMonths(); } break;
       case "tien_thangtruoc": setValue("tien_tt", payload, "đ", true); if (live) { tienPrev = Number(payload); syncMonths(); } break;
       case "status_ngaychot": document.getElementById("lbl_ngay").innerText = payload; chotDay = Number(payload) || 0; if (live) syncMonths(); drawMonths(); break;
@@ -843,7 +862,7 @@
     if (!espState) { el.textContent = ""; return; }
     if (espState !== "online") {
       el.style.color = "#ff3366";
-      el.textContent = "🔴 ESP32 đang NGOẠI TUYẾN (mất kết nối với broker)";
+      el.innerHTML = "🔴 ESP32 đang NGOẠI TUYẾN (mất kết nối với broker)";
       return;
     }
     const parts = ["🟢 ESP32 trực tuyến"];
@@ -852,8 +871,16 @@
     }
     if (espUptime !== null && !isNaN(espUptime)) parts.push("chạy " + fmtDur(espUptime));
     if (espRecon !== null && !isNaN(espRecon)) parts.push("nối lại MQTT " + Math.max(0, espRecon - 1) + " lần");
+    if (espHeap !== null && !isNaN(espHeap)) parts.push("RAM trống " + Math.round(espHeap / 1024) + " KB");
     el.style.color = "#7ddc9a";
-    el.textContent = parts.join(" · ");
+    let html = parts.join(" · ");
+    // lần rớt kết nối gần nhất của ESP32 (để biết nguyên nhân)
+    if (espRecon !== null && espRecon > 1 && (espDrc !== 0 || espDup > 0)) {
+      const RC = { "-4": "hết thời gian chờ", "-3": "đứt kết nối", "-2": "không kết nối được", "-1": "bị ngắt", "1": "sai phiên bản", "2": "trùng tên thiết bị", "3": "broker không sẵn sàng", "4": "sai tài khoản", "5": "không được phép" };
+      html += "<br>Lần rớt gần nhất: lỗi " + espDrc + " (" + (RC[String(espDrc)] || "không rõ") + ") · trước đó kết nối " +
+              espDup + " giây · mất " + espDout + " giây để nối lại";
+    }
+    el.innerHTML = html;
   }
 
   // ---- giám sát: đang "kết nối" mà không có dữ liệu thì nói rõ và tự nối lại ----
