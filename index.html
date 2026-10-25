@@ -32,7 +32,7 @@
     }
     * { box-sizing: border-box; }
     html, body { font-family: 'Segoe UI', Arial, sans-serif; background-color: var(--bg-color); color: var(--text-main); margin: 0; padding: 0; }
-    .container { max-width: 760px; margin: 0 auto; padding: calc(14px + env(safe-area-inset-top)) calc(12px + env(safe-area-inset-right)) calc(84px + env(safe-area-inset-bottom)) calc(12px + env(safe-area-inset-left)); }
+    .container { max-width: 760px; margin: 0 auto; padding: calc(14px + env(safe-area-inset-top)) calc(12px + env(safe-area-inset-right)) 20px calc(12px + env(safe-area-inset-left)); }
     html, body { overscroll-behavior-y: none; -webkit-tap-highlight-color: transparent; }
     h1 { text-align: center; color: var(--neon-cyan); font-size: clamp(17px, 5vw, 24px); letter-spacing: 1.5px; text-transform: uppercase; margin: 6px 0 4px; text-shadow: 0 0 10px rgba(0, 240, 255, 0.3); }
     .mqtt-status { text-align: center; font-size: 13px; font-weight: bold; margin-bottom: 16px; color: var(--neon-red); }
@@ -102,7 +102,12 @@
     .calc-note { font-size: 12px; color: var(--text-muted); margin: 4px 2px 0; line-height: 1.5; }
     .card.diag::before { background: var(--text-muted); }
     .diag-line { font-size: 13px; line-height: 1.6; color: var(--text-muted); margin-top: 4px; }
-    .tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; display: flex; justify-content: center;
+    /* Khung app: chỉ phần nội dung cuộn, thanh dưới đứng yên (không bị kéo nảy, không trôi theo thanh Safari) */
+    html, body { position: fixed; inset: 0; width: 100%; height: 100%; overflow: hidden; }
+    .app { position: fixed; inset: 0; display: flex; flex-direction: column; }
+    .scroller { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+    .app.kb .tabbar { display: none; }               /* đang gõ phím: ẩn thanh dưới như app thật */
+    .tabbar { position: relative; flex: 0 0 auto; z-index: 10; display: flex; justify-content: center;
               background: rgba(13, 19, 36, .92); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
               border-top: 1px solid var(--line); padding: 6px 8px calc(6px + env(safe-area-inset-bottom)); }
     .tabbar button { flex: 1; max-width: 200px; background: none; border: 0; padding: 4px 0 2px; color: var(--text-muted);
@@ -114,6 +119,8 @@
   </style>
 </head>
 <body>
+<div class="app">
+<div class="scroller" id="scroller">
 <div class="container">
   <h1>⚡ Giám Sát Điện Năng</h1>
   <div id="mqtt-info" class="mqtt-status sync">⟳ Đang cập nhật...</div>
@@ -228,8 +235,9 @@
     </div>
   </section>
 </div>
+</div>
 
-<!-- Thanh chuyển mục dưới đáy (như app) -->
+<!-- Thanh chuyển mục dưới đáy: luôn đứng yên, không cuộn theo nội dung -->
 <nav class="tabbar" id="tabbar">
   <button data-tab="main">
     <svg viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg><span>Thông số</span>
@@ -244,6 +252,7 @@
     <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg><span>Cài đặt</span>
   </button>
 </nav>
+</div>
 
 <script>
   // ================= CẤU HÌNH MQTT =================
@@ -991,6 +1000,15 @@
   (function () {
     const TKEY = "pzem_tab_" + TOPIC_PREFIX;
     const bar = document.getElementById("tabbar");
+    const sc = document.getElementById("scroller");
+    const app = document.querySelector(".app");
+    const pos = {};
+    // bàn phím mở (đang nhập số): ẩn thanh dưới, gõ xong hiện lại
+    const isField = el => el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA");
+    document.addEventListener("focusin", e => { if (isField(e.target)) app.classList.add("kb"); });
+    document.addEventListener("focusout", e => {
+      if (isField(e.target)) setTimeout(() => { if (!isField(document.activeElement)) { app.classList.remove("kb"); window.scrollTo(0, 0); } }, 60);
+    });
     function show(name, save) {
       if (!document.getElementById("tab-" + name)) name = "main";
       curTab = name;
@@ -1002,9 +1020,10 @@
     bar.addEventListener("click", function (ev) {
       const b = ev.target.closest("button");
       if (!b) return;
-      if (b.dataset.tab === curTab) { window.scrollTo({ top: 0, behavior: "smooth" }); return; }
+      if (b.dataset.tab === curTab) { sc.scrollTo({ top: 0, behavior: "smooth" }); return; }
+      pos[curTab] = sc.scrollTop;                       // nhớ chỗ đang xem của từng mục
       show(b.dataset.tab, true);
-      window.scrollTo(0, 0);
+      sc.scrollTop = pos[curTab] || 0;
     });
     let start = "main";
     try { start = localStorage.getItem(TKEY) || "main"; } catch (e) {}
