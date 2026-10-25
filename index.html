@@ -2,8 +2,18 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Hệ Thống Giám Sát Điện Năng - MQTT Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Giám sát điện năng</title>
+  <!-- Chạy như app khi "Thêm vào MH chính" trên iPhone: toàn màn hình, có icon, tên riêng -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Điện năng">
+  <meta name="theme-color" content="#0a0f1d">
+  <meta name="format-detection" content="telephone=no">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-180.png">
+  <link rel="icon" type="image/png" href="icon-192.png">
   <!-- Thư viện MQTT qua WebSocket (Paho) và đồ thị (Chart.js) - đã sửa đúng đường dẫn -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
   <style>
@@ -22,11 +32,13 @@
     }
     * { box-sizing: border-box; }
     html, body { font-family: 'Segoe UI', Arial, sans-serif; background-color: var(--bg-color); color: var(--text-main); margin: 0; padding: 0; }
-    .container { max-width: 760px; margin: 0 auto; padding: 14px 12px 28px; }
+    .container { max-width: 760px; margin: 0 auto; padding: calc(14px + env(safe-area-inset-top)) calc(12px + env(safe-area-inset-right)) calc(28px + env(safe-area-inset-bottom)) calc(12px + env(safe-area-inset-left)); }
+    html, body { overscroll-behavior-y: none; -webkit-tap-highlight-color: transparent; }
     h1 { text-align: center; color: var(--neon-cyan); font-size: clamp(17px, 5vw, 24px); letter-spacing: 1.5px; text-transform: uppercase; margin: 6px 0 4px; text-shadow: 0 0 10px rgba(0, 240, 255, 0.3); }
     .mqtt-status { text-align: center; font-size: 13px; font-weight: bold; margin-bottom: 16px; color: var(--neon-red); }
     .mqtt-status.connected { color: var(--neon-green); }
     .mqtt-status.warn { color: var(--neon-orange); }
+    .mqtt-status.sync { color: var(--text-muted); font-weight: 600; }
 
     /* Mỗi hàng là một lưới cố định 3 hoặc 2 cột, không xuống dòng */
     .row { display: grid; gap: 10px; margin-bottom: 10px; }
@@ -80,7 +92,7 @@
 <body>
 <div class="container">
   <h1>⚡ Giám Sát Điện Năng</h1>
-  <div id="mqtt-info" class="mqtt-status">🔴 ĐANG KẾT NỐI BROKER MQTT...</div>
+  <div id="mqtt-info" class="mqtt-status sync">⟳ Đang cập nhật...</div>
   <div id="age" style="text-align:center;font-size:12px;color:var(--text-muted);margin:-10px 0 6px;"></div>
   <div id="esp" style="text-align:center;font-size:12px;margin:0 0 14px;color:var(--text-muted);"></div>
 
@@ -195,7 +207,7 @@
   const infoEl = document.getElementById("mqtt-info");
   function setStatus(text, ok) {
     infoEl.innerHTML = text;
-    infoEl.className = "mqtt-status" + (ok === true ? " connected" : (ok === "warn" ? " warn" : ""));
+    infoEl.className = "mqtt-status" + (ok === true ? " connected" : (ok === "warn" ? " warn" : (ok === "sync" ? " sync" : "")));
   }
   // Cập nhật số có hiệu ứng chuyển mượt (0.4 giây), gom vào một vòng vẽ chung
   const anim = {};
@@ -251,13 +263,15 @@
 
   let reconnectTimer = null;
   let connecting = false;
+  let hasCache = false, cacheTime = "";   // đã có số liệu lưu từ lần mở trước (hiện ngay, không báo đỏ)
   let connStart = 0, lastConnTime = 0, dropCount = 0, failCount = 0, lastLost = "", retryMs = 2000;
 
   function connectMQTT() {
     if (connecting) return;
     connecting = true;
     connStart = Date.now();
-    setStatus("🔴 ĐANG KẾT NỐI BROKER MQTT...", false);
+    if (hasCache) setStatus("⟳ Đang cập nhật..." + (cacheTime ? " (số liệu lúc " + cacheTime + ")" : ""), "sync");
+    else setStatus("🔴 ĐANG KẾT NỐI BROKER MQTT...", false);
     const c = client;
     try {
       c.connect({
@@ -267,7 +281,7 @@
         },
         onFailure: function (err) { if (c === client) onFailure(err); },
         useSSL: USE_SSL,
-        timeout: 12,
+        timeout: 8,
         keepAliveInterval: 20,
         cleanSession: true
       });
@@ -286,7 +300,7 @@
       client = newClient();                             // client mới, sạch trạng thái
       connectMQTT();
     }, retryMs);
-    retryMs = Math.min(10000, Math.round(retryMs * 1.5));   // thử lại giãn dần: 2s, 3s, 4.5s ... tối đa 10s
+    retryMs = Math.min(8000, Math.round(retryMs * 1.5));   // thử lại giãn dần: 2s, 3s, 4.5s ... tối đa 10s
   }
 
   function onConnect() {
@@ -295,7 +309,7 @@
     retryMs = 2000;
     warned = false;
     gotData = false;
-    setStatus("🟢 ĐÃ KẾT NỐI BROKER - ĐANG CHỜ DỮ LIỆU TỪ ESP32...", true);
+    if (!hasCache) setStatus("🟢 ĐÃ KẾT NỐI BROKER - ĐANG CHỜ DỮ LIỆU TỪ ESP32...", true);
     client.subscribe(TOPIC_PREFIX + "/#");
   }
 
@@ -309,6 +323,7 @@
   function onConnectionLost(resp) {
     dropCount++;
     lastLost = (resp && resp.errorMessage) ? String(resp.errorMessage).slice(0, 60) : "";
+    if (document.visibilityState === "hidden") return;   // app đang ẩn: iOS cắt mạng, mở lại sẽ nối ngay
     setStatus("🔴 MẤT KẾT NỐI MQTT, ĐANG THỬ LẠI...", false);
     scheduleReconnect();
   }
@@ -802,16 +817,24 @@
 
   // Hiện ngay số liệu lần trước (nếu có) trong lúc chờ kết nối, số mới tới sẽ thay thế
   const CACHE_KEY = "pzem_cache_" + TOPIC_PREFIX;
+  const CACHE_TKEY = "pzem_cache_t_" + TOPIC_PREFIX;
   try {
     const saved = JSON.parse(localStorage.getItem(CACHE_KEY) || "{}");
-    for (const t in saved) handleTopic(t, saved[t]);
+    for (const t in saved) { handleTopic(t, saved[t]); hasCache = true; }
     latestPower = null;   // không đưa số cũ vào đồ thị
     latestVoltage = null;
+    const ts = Number(localStorage.getItem(CACHE_TKEY)) || 0;
+    if (hasCache && ts) {
+      const d = new Date(ts), p2 = n => String(n).padStart(2, "0");
+      cacheTime = p2(d.getHours()) + ":" + p2(d.getMinutes()) +
+                  (new Date().toDateString() === d.toDateString() ? "" : " " + p2(d.getDate()) + "/" + p2(d.getMonth() + 1));
+    }
   } catch (e) {}
-  setInterval(function () {
+  function saveCache() {
     if (!gotData) return;
-    try { localStorage.setItem(CACHE_KEY, JSON.stringify(cache)); } catch (e) {}
-  }, 5000);
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify(cache)); localStorage.setItem(CACHE_TKEY, String(lastMsg || Date.now())); } catch (e) {}
+  }
+  setInterval(saveCache, 5000);
 
   // Hiển thị: dữ liệu mới nhất cách bao lâu, ESP32 gửi mỗi bao lâu
   setInterval(function () {
@@ -832,6 +855,7 @@
   // Quay lại trang sau khi bị ẩn lâu / có mạng trở lại: nối lại ngay, không chờ chu kỳ tự thử
   let hiddenAt = 0;
   function forceReconnect() {
+    if (gotData || hasCache) { hasCache = true; cacheTime = ""; }   // đang có số trên màn hình: chỉ báo "đang cập nhật"
     if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
     const old = client;
     client = newClient();                 // bỏ hẳn client cũ, không dùng lại trạng thái cũ
@@ -839,13 +863,18 @@
     try { old.disconnect(); } catch (e) {}
     connectMQTT();
   }
-  document.addEventListener("visibilitychange", function () {
-    if (document.visibilityState === "hidden") { hiddenAt = Date.now(); return; }
-    // điện thoại hay ngắt WebSocket ngầm khi ẩn trang: ẩn quá 15 giây thì nối lại cho chắc
-    if (hiddenAt && Date.now() - hiddenAt > 15000) forceReconnect();
+  function onResume() {
+    // iPhone cắt WebSocket vài giây sau khi thoát app: ẩn quá 3 giây thì nối lại NGAY (số cũ vẫn hiện trong lúc nối)
+    if (hiddenAt && Date.now() - hiddenAt > 3000) forceReconnect();
     else if (!client.isConnected() && !connecting) forceReconnect();
     hiddenAt = 0;
+  }
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "hidden") { hiddenAt = Date.now(); saveCache(); return; }
+    onResume();
   });
+  window.addEventListener("pagehide", function () { hiddenAt = hiddenAt || Date.now(); saveCache(); });
+  window.addEventListener("pageshow", function (ev) { if (ev.persisted) { hiddenAt = hiddenAt || 1; onResume(); } });
   window.addEventListener("online", function () {
     if (!client.isConnected() && !connecting) forceReconnect();
   });
@@ -900,6 +929,11 @@
 
   // Bắt đầu kết nối
   connectMQTT();
+
+  // Lưu sẵn trang + thư viện trong máy (service worker): mở app là hiện ngay, kể cả khi mạng yếu
+  if ("serviceWorker" in navigator && location.protocol === "https:") {
+    navigator.serviceWorker.register("sw.js").catch(function () {});
+  }
 </script>
 </body>
 </html>
