@@ -32,7 +32,7 @@
     }
     * { box-sizing: border-box; }
     html, body { font-family: 'Segoe UI', Arial, sans-serif; background-color: var(--bg-color); color: var(--text-main); margin: 0; padding: 0; }
-    .container { max-width: 760px; margin: 0 auto; padding: calc(14px + env(safe-area-inset-top)) calc(12px + env(safe-area-inset-right)) calc(28px + env(safe-area-inset-bottom)) calc(12px + env(safe-area-inset-left)); }
+    .container { max-width: 760px; margin: 0 auto; padding: calc(14px + env(safe-area-inset-top)) calc(12px + env(safe-area-inset-right)) calc(84px + env(safe-area-inset-bottom)) calc(12px + env(safe-area-inset-left)); }
     html, body { overscroll-behavior-y: none; -webkit-tap-highlight-color: transparent; }
     h1 { text-align: center; color: var(--neon-cyan); font-size: clamp(17px, 5vw, 24px); letter-spacing: 1.5px; text-transform: uppercase; margin: 6px 0 4px; text-shadow: 0 0 10px rgba(0, 240, 255, 0.3); }
     .mqtt-status { text-align: center; font-size: 13px; font-weight: bold; margin-bottom: 16px; color: var(--neon-red); }
@@ -87,108 +87,153 @@
     .range { display: flex; gap: 6px; margin-bottom: 6px; }
     .range button { flex: 1; padding: 5px 0; font-size: 12px; background: transparent; color: var(--text-muted); border: 1px solid var(--line); border-radius: 6px; font-weight: 600; }
     .range button.on { color: #000; background: var(--neon-cyan); border-color: var(--neon-cyan); }
+
+    /* Chia mục + thanh chuyển mục dưới đáy */
+    .tab { display: none; }
+    .tab.on { display: block; animation: tabIn .18s ease-out; }
+    @keyframes tabIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+    .sec-title { font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin: 16px 2px 8px; }
+    .tab > .sec-title:first-child { margin-top: 4px; }
+    .chart-box.big { height: 360px; }
+    .month-box { margin-top: 0; }
+    .row-input { flex-direction: row; }
+    .row-input input { flex: 1; }
+    .row-input button { flex: 0 0 110px; }
+    .card.diag::before { background: var(--text-muted); }
+    .diag-line { font-size: 13px; line-height: 1.6; color: var(--text-muted); margin-top: 4px; }
+    .tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; display: flex; justify-content: center;
+              background: rgba(13, 19, 36, .92); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+              border-top: 1px solid var(--line); padding: 6px 8px calc(6px + env(safe-area-inset-bottom)); }
+    .tabbar button { flex: 1; max-width: 200px; background: none; border: 0; padding: 4px 0 2px; color: var(--text-muted);
+                     display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 11px; font-weight: 600; border-radius: 10px; }
+    .tabbar button:active { background: rgba(255,255,255,.05); }
+    .tabbar svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .tabbar button[data-tab="main"] svg { fill: currentColor; stroke: none; }
+    .tabbar button.on { color: var(--neon-cyan); }
   </style>
 </head>
 <body>
 <div class="container">
   <h1>⚡ Giám Sát Điện Năng</h1>
   <div id="mqtt-info" class="mqtt-status sync">⟳ Đang cập nhật...</div>
-  <div id="age" style="text-align:center;font-size:12px;color:var(--text-muted);margin:-10px 0 6px;"></div>
-  <div id="esp" style="text-align:center;font-size:12px;margin:0 0 14px;color:var(--text-muted);"></div>
 
-  <!-- Hàng 1: Điện áp - Dòng điện - Công suất -->
-  <div class="row r3">
-    <div class="card"><div class="label">Điện áp</div><div class="value" id="v">0<span class="unit">V</span></div></div>
-    <div class="card"><div class="label">Dòng điện</div><div class="value" id="a">0<span class="unit">A</span></div></div>
-    <div class="card"><div class="label">Công suất</div><div class="value" id="w">0<span class="unit">W</span></div></div>
-  </div>
-
-  <!-- Hàng 2: Tần số + Cos phi trong 1 ô -->
-  <div class="row r1">
-    <div class="card">
-      <div class="split">
-        <div><div class="label">Tần số</div><div class="value" id="hz">0<span class="unit">Hz</span></div></div>
-        <div><div class="label">Hệ số cos phi</div><div class="value" id="pf">0</div></div>
+  <!-- ================= MỤC 1: THÔNG SỐ ================= -->
+  <section class="tab" id="tab-main">
+    <div class="sec-title">Đo trực tiếp</div>
+    <div class="row r3">
+      <div class="card"><div class="label">Điện áp</div><div class="value" id="v">0<span class="unit">V</span></div></div>
+      <div class="card"><div class="label">Dòng điện</div><div class="value" id="a">0<span class="unit">A</span></div></div>
+      <div class="card"><div class="label">Công suất</div><div class="value" id="w">0<span class="unit">W</span></div></div>
+    </div>
+    <div class="row r1">
+      <div class="card">
+        <div class="split">
+          <div><div class="label">Tần số</div><div class="value" id="hz">0<span class="unit">Hz</span></div></div>
+          <div><div class="label">Hệ số cos phi</div><div class="value" id="pf">0</div></div>
+        </div>
       </div>
     </div>
-  </div>
 
-  <!-- Hàng 3: Điện năng hôm nay - hôm qua -->
-  <div class="row r2">
-    <div class="card energy"><div class="label">Điện năng hôm nay</div><div class="value" id="kwh_hn">0<span class="unit">kWh</span></div></div>
-    <div class="card energy"><div class="label">Điện năng hôm qua</div><div class="value" id="kwh_hq">0<span class="unit">kWh</span></div></div>
-  </div>
+    <div class="sec-title">Điện năng</div>
+    <div class="row r2">
+      <div class="card energy"><div class="label">Hôm nay</div><div class="value" id="kwh_hn">0<span class="unit">kWh</span></div></div>
+      <div class="card energy"><div class="label">Hôm qua</div><div class="value" id="kwh_hq">0<span class="unit">kWh</span></div></div>
+    </div>
+    <div class="row r2">
+      <div class="card energy"><div class="label">Tháng này</div><div class="value" id="kwh_tn">0<span class="unit">kWh</span></div></div>
+      <div class="card energy"><div class="label">Tháng trước</div><div class="value" id="kwh_tt">0<span class="unit">kWh</span></div></div>
+    </div>
+    <div class="row r1">
+      <div class="card total"><div class="label">⚡ Tổng chỉ số công tơ</div><div class="value" id="kwh_tong" style="color:var(--neon-yellow);">0<span class="unit">kWh</span></div></div>
+    </div>
 
-  <!-- Hàng 4: Điện năng tháng này - tháng trước -->
-  <div class="row r2">
-    <div class="card energy"><div class="label">Điện năng tháng này</div><div class="value" id="kwh_tn">0<span class="unit">kWh</span></div></div>
-    <div class="card energy"><div class="label">Điện năng tháng trước</div><div class="value" id="kwh_tt">0<span class="unit">kWh</span></div></div>
-  </div>
-
-  <!-- Hàng 5: Tiền điện tháng này - tháng trước -->
-  <div class="row r2">
-    <div class="card money"><div class="label">💰 Tiền điện tháng này</div><div class="value" id="tien_tn" style="color:var(--neon-green);">0<span class="unit">đ</span></div></div>
-    <div class="card money"><div class="label">🗓️ Tiền điện tháng trước</div><div class="value" id="tien_tt" style="color:var(--neon-purple);">0<span class="unit">đ</span></div></div>
-  </div>
-
-  <!-- Tổng chỉ số công tơ (nằm trên hàng cài đặt) -->
-  <div class="row r1">
-    <div class="card total"><div class="label">⚡ Tổng chỉ số công tơ</div><div class="value" id="kwh_tong" style="color:var(--neon-yellow);">0<span class="unit">kWh</span></div></div>
-  </div>
-
-  <!-- Hàng 6: Cài ngày chốt sổ - Cài đơn giá -->
-  <div class="row r2">
-    <div class="card setting">
-      <div class="label" style="color:var(--neon-orange);">📅 Ngày chốt sổ</div>
-      <div class="set-cur">Hiện tại: <b id="lbl_ngay">--</b></div>
-      <div class="input-group">
-        <input type="number" id="input_ngay" min="1" max="28" value="2">
-        <button onclick="publishSetting('set_ngaychot', 'input_ngay')">Cập nhật ngày</button>
+    <div class="sec-title">Tiền điện</div>
+    <div class="row r2">
+      <div class="card money"><div class="label">💰 Tháng này</div><div class="value" id="tien_tn" style="color:var(--neon-green);">0<span class="unit">đ</span></div></div>
+      <div class="card money"><div class="label">🗓️ Tháng trước</div><div class="value" id="tien_tt" style="color:var(--neon-purple);">0<span class="unit">đ</span></div></div>
+    </div>
+    <div class="row r1">
+      <div class="card calc">
+        <div class="label" style="color:var(--neon-green);">🧾 Bảng tính tiền phòng tháng này</div>
+        <div class="calc-row"><span>Tiền trọ</span><input type="number" inputmode="numeric" id="c_tro" placeholder="0"></div>
+        <div class="calc-row"><span>Số nước<small>m³ đã dùng</small></span><input type="number" inputmode="decimal" step="any" id="c_m3" placeholder="0"></div>
+        <div class="calc-row"><span>Giá nước<small>đ cho 1 m³</small></span><input type="number" inputmode="numeric" id="c_gia" placeholder="0"></div>
+        <div class="calc-row"><span>Tiền nước<small>= số m³ × giá nước</small></span><b id="c_nuoc">0 đ</b></div>
+        <div class="calc-row"><span>Tiền điện<small>tháng này, tự lấy từ công tơ</small></span><b id="c_dien">0 đ</b></div>
+        <div class="calc-row"><span>Tiền khác</span><input type="number" inputmode="numeric" id="c_khac" placeholder="0"></div>
+        <div class="calc-total"><span>TỔNG CỘNG</span><b id="c_tong">0 đ</b></div>
       </div>
     </div>
-    <div class="card setting">
-      <div class="label" style="color:var(--neon-orange);">💰 Đơn giá điện</div>
-      <div class="set-cur">Hiện tại: <b id="lbl_gia">--</b> đ</div>
-      <div class="input-group">
-        <input type="number" id="input_gia" value="3500">
-        <button onclick="publishSetting('set_dongia', 'input_gia')">Cập nhật đơn giá</button>
+  </section>
+
+  <!-- ================= MỤC 2: BIỂU ĐỒ ================= -->
+  <section class="tab" id="tab-chart">
+    <div class="sec-title">Công suất và điện áp</div>
+    <div class="chart-box big">
+      <div class="range" id="range">
+        <button data-w="60000">1 phút</button>
+        <button data-w="600000">10 phút</button>
+        <button data-w="3600000">1 giờ</button>
+      </div>
+      <canvas id="realtimeChart"></canvas>
+    </div>
+    <div class="sec-title">Tiền điện các tháng</div>
+    <div class="month-box">
+      <div class="range" id="mrange">
+        <button data-n="6">6 tháng</button>
+        <button data-n="12">12 tháng</button>
+      </div>
+      <canvas id="monthChart"></canvas>
+    </div>
+  </section>
+
+  <!-- ================= MỤC 3: CÀI ĐẶT ================= -->
+  <section class="tab" id="tab-setup">
+    <div class="sec-title">Tính tiền điện</div>
+    <div class="row r1">
+      <div class="card setting">
+        <div class="label" style="color:var(--neon-orange);">📅 Ngày chốt sổ</div>
+        <div class="set-cur">Hiện tại: <b id="lbl_ngay">--</b> (1 - 28)</div>
+        <div class="input-group row-input">
+          <input type="number" id="input_ngay" min="1" max="28" value="2" inputmode="numeric">
+          <button onclick="publishSetting('set_ngaychot', 'input_ngay')">Cập nhật</button>
+        </div>
       </div>
     </div>
-  </div>
-
-  <!-- Hàng cuối: Biểu đồ -->
-  <div class="chart-box">
-    <div class="range" id="range">
-      <button data-w="60000">1 phút</button>
-      <button data-w="600000">10 phút</button>
-      <button data-w="3600000">1 giờ</button>
+    <div class="row r1">
+      <div class="card setting">
+        <div class="label" style="color:var(--neon-orange);">💰 Đơn giá điện</div>
+        <div class="set-cur">Hiện tại: <b id="lbl_gia">--</b> đ/kWh</div>
+        <div class="input-group row-input">
+          <input type="number" id="input_gia" value="3500" inputmode="numeric">
+          <button onclick="publishSetting('set_dongia', 'input_gia')">Cập nhật</button>
+        </div>
+      </div>
     </div>
-    <canvas id="realtimeChart"></canvas>
-  </div>
-
-  <!-- Bảng tính tiền phòng tháng này -->
-  <div class="row r1">
-    <div class="card calc">
-      <div class="label" style="color:var(--neon-green);">🧾 Bảng tính tiền phòng tháng này</div>
-      <div class="calc-row"><span>Tiền trọ</span><input type="number" inputmode="numeric" id="c_tro" placeholder="0"></div>
-      <div class="calc-row"><span>Số nước<small>m³ đã dùng</small></span><input type="number" inputmode="decimal" step="any" id="c_m3" placeholder="0"></div>
-      <div class="calc-row"><span>Giá nước<small>đ cho 1 m³</small></span><input type="number" inputmode="numeric" id="c_gia" placeholder="0"></div>
-      <div class="calc-row"><span>Tiền nước<small>= số m³ × giá nước</small></span><b id="c_nuoc">0 đ</b></div>
-      <div class="calc-row"><span>Tiền điện<small>tháng này, tự lấy từ công tơ</small></span><b id="c_dien">0 đ</b></div>
-      <div class="calc-row"><span>Tiền khác</span><input type="number" inputmode="numeric" id="c_khac" placeholder="0"></div>
-      <div class="calc-total"><span>TỔNG CỘNG</span><b id="c_tong">0 đ</b></div>
+    <div class="sec-title">Trạng thái kết nối</div>
+    <div class="row r1">
+      <div class="card diag">
+        <div class="label">ESP32</div>
+        <div id="esp" class="diag-line">Chưa có thông tin từ ESP32</div>
+        <div class="label" style="margin-top:12px;">Ứng dụng</div>
+        <div id="age" class="diag-line"></div>
+      </div>
     </div>
-  </div>
-
-  <!-- Thống kê tiền điện các tháng (dưới cùng) -->
-  <div class="month-box">
-    <div class="range" id="mrange">
-      <button data-n="6">6 tháng</button>
-      <button data-n="12">12 tháng</button>
-    </div>
-    <canvas id="monthChart"></canvas>
-  </div>
+  </section>
 </div>
+
+<!-- Thanh chuyển mục dưới đáy (như app) -->
+<nav class="tabbar" id="tabbar">
+  <button data-tab="main">
+    <svg viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg><span>Thông số</span>
+  </button>
+  <button data-tab="chart">
+    <svg viewBox="0 0 24 24"><path d="M3 20h18M5 16l4-5 4 3 6-8"/></svg><span>Biểu đồ</span>
+  </button>
+  <button data-tab="setup">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg><span>Cài đặt</span>
+  </button>
+</nav>
 
 <script>
   // ================= CẤU HÌNH MQTT =================
@@ -411,6 +456,7 @@
   // ================= ĐỒ THỊ CÔNG SUẤT + ĐIỆN ÁP (tự vẽ, cuộn liên tục, có lưu lịch sử) =================
   let latestPower = null;
   let latestVoltage = null;
+  let curTab = "main";                                 // mục đang mở
   (function () {
     const canvas = document.getElementById("realtimeChart");
     const ctx = canvas.getContext("2d");
@@ -462,6 +508,7 @@
     let pendingResize = false;
     function applySize() {
       const box = canvas.parentElement;
+      if (box.clientWidth <= 0) return;                 // mục Biểu đồ đang ẩn
       const dpr = window.devicePixelRatio || 1;
       const nw = box.clientWidth - 28;
       const nh = box.clientHeight - 28 - rangeEl.offsetHeight - 6;
@@ -507,6 +554,9 @@
       }
       while (pts.length && nowMs - pts[0].t > 62000) pts.shift();
       while (hist.length && nowMs - hist[0].t > HIST_KEEP + 10000) hist.shift();
+      if (curTab !== "chart") return;                  // đang ở mục khác: vẫn ghi lịch sử, không vẽ (đỡ tốn pin)
+      if (W <= 0 || canvas.parentElement.clientWidth - 28 !== W) applySize();
+      if (W <= 0) return;
 
       const headP = freshP && smoothP !== null;
       const headU = freshU && smoothU !== null;
@@ -926,6 +976,30 @@
     setStatus("🟠 ĐÃ KẾT NỐI NHƯNG KHÔNG CÓ DỮ LIỆU (" + Math.round(silent / 1000) + " giây)", "warn");
     if (silent > 30000 && now - lastForce > 45000) { lastForce = now; forceReconnect(); }   // kết nối "treo ngầm" trên mạng di động
   }, 3000);
+
+  // ================= CHUYỂN MỤC (Thông số / Biểu đồ / Cài đặt) =================
+  (function () {
+    const TKEY = "pzem_tab_" + TOPIC_PREFIX;
+    const bar = document.getElementById("tabbar");
+    function show(name, save) {
+      if (!document.getElementById("tab-" + name)) name = "main";
+      curTab = name;
+      document.querySelectorAll(".tab").forEach(s => s.classList.toggle("on", s.id === "tab-" + name));
+      bar.querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.tab === name));
+      if (name === "chart") drawMonths();               // canvas chỉ đo được kích thước khi mục đang hiện
+      if (save) { try { localStorage.setItem(TKEY, name); } catch (e) {} }
+    }
+    bar.addEventListener("click", function (ev) {
+      const b = ev.target.closest("button");
+      if (!b) return;
+      if (b.dataset.tab === curTab) { window.scrollTo({ top: 0, behavior: "smooth" }); return; }
+      show(b.dataset.tab, true);
+      window.scrollTo(0, 0);
+    });
+    let start = "main";
+    try { start = localStorage.getItem(TKEY) || "main"; } catch (e) {}
+    show(start, false);
+  })();
 
   // Bắt đầu kết nối
   connectMQTT();
