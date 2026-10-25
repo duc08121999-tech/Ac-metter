@@ -256,11 +256,15 @@
 
 <script>
   // ================= CẤU HÌNH MQTT =================
-  // Broker công cộng HiveMQ: WebSocket thường = 8000, WebSocket bảo mật (SSL) = 8884
-  const MQTT_BROKER = "broker.hivemq.com";
-  const USE_SSL     = true;                 // true -> cổng 8884, false -> cổng 8000
-  const MQTT_PORT   = USE_SSL ? 8884 : 8000;
-  const MQTT_PATH   = "/mqtt";              // HiveMQ bắt buộc đường dẫn /mqtt
+  // Broker riêng EMQX Cloud Serverless: WebSocket bảo mật (wss) cổng 8084, đường dẫn /mqtt
+  const MQTT_BROKER = "y63c1160.ala.us-east-1.emqxsl.com";
+  const USE_SSL     = true;
+  const MQTT_PORT   = 8084;                 // WebSocket over TLS/SSL Port
+  const MQTT_PATH   = "/mqtt";
+  // Tài khoản tạo trong EMQX: Access Control > Authentication (dùng tài khoản "web", KHÁC tài khoản của ESP32)
+  // Lưu ý: ai xem được mã trang này đều thấy mật khẩu, đừng chia sẻ địa chỉ trang cho người lạ.
+  const MQTT_USER   = "web";
+  const MQTT_PASS   = "Duc9018@";                    // mật khẩu tài khoản web
 
   // Tiền tố topic: PHẢI trùng với MQTT_PREFIX trong code ESP32.
   // Broker công cộng ai cũng đọc/ghi được nên dùng chuỗi riêng, không dùng "pzem" chung.
@@ -345,7 +349,9 @@
         },
         onFailure: function (err) { if (c === client) onFailure(err); },
         useSSL: USE_SSL,
-        timeout: 8,
+        userName: MQTT_USER,
+        password: MQTT_PASS,
+        timeout: 10,
         keepAliveInterval: 20,
         cleanSession: true
       });
@@ -380,6 +386,10 @@
   function onFailure(err) {
     connecting = false;
     failCount++;
+    if (MQTT_PASS.indexOf("DIEN_MAT_KHAU") >= 0) { setStatus("🔴 CHƯA ĐIỀN MẬT KHẨU MQTT (MQTT_PASS) TRONG FILE index.html", false); scheduleReconnect(); return; }
+    if (err && (err.errorCode === 6 || /auth|password|not authori/i.test(err.errorMessage || ""))) {
+      setStatus("🔴 SAI TÀI KHOẢN / MẬT KHẨU MQTT - kiểm tra MQTT_USER, MQTT_PASS", false); scheduleReconnect(); return;
+    }
     setStatus("🔴 KẾT NỐI THẤT BẠI: " + (err.errorMessage || err.errorCode) + " - thử lại sau 2 giây", false);
     scheduleReconnect();
   }
