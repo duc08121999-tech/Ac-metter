@@ -99,6 +99,7 @@
     .row-input { flex-direction: row; }
     .row-input input { flex: 1; }
     .row-input button { flex: 0 0 110px; }
+    .calc-note { font-size: 12px; color: var(--text-muted); margin: 4px 2px 0; line-height: 1.5; }
     .card.diag::before { background: var(--text-muted); }
     .diag-line { font-size: 13px; line-height: 1.6; color: var(--text-muted); margin-top: 4px; }
     .tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; display: flex; justify-content: center;
@@ -152,18 +153,6 @@
       <div class="card money"><div class="label">💰 Tháng này</div><div class="value" id="tien_tn" style="color:var(--neon-green);">0<span class="unit">đ</span></div></div>
       <div class="card money"><div class="label">🗓️ Tháng trước</div><div class="value" id="tien_tt" style="color:var(--neon-purple);">0<span class="unit">đ</span></div></div>
     </div>
-    <div class="row r1">
-      <div class="card calc">
-        <div class="label" style="color:var(--neon-green);">🧾 Bảng tính tiền phòng tháng này</div>
-        <div class="calc-row"><span>Tiền trọ</span><input type="number" inputmode="numeric" id="c_tro" placeholder="0"></div>
-        <div class="calc-row"><span>Số nước<small>m³ đã dùng</small></span><input type="number" inputmode="decimal" step="any" id="c_m3" placeholder="0"></div>
-        <div class="calc-row"><span>Giá nước<small>đ cho 1 m³</small></span><input type="number" inputmode="numeric" id="c_gia" placeholder="0"></div>
-        <div class="calc-row"><span>Tiền nước<small>= số m³ × giá nước</small></span><b id="c_nuoc">0 đ</b></div>
-        <div class="calc-row"><span>Tiền điện<small>tháng này, tự lấy từ công tơ</small></span><b id="c_dien">0 đ</b></div>
-        <div class="calc-row"><span>Tiền khác</span><input type="number" inputmode="numeric" id="c_khac" placeholder="0"></div>
-        <div class="calc-total"><span>TỔNG CỘNG</span><b id="c_tong">0 đ</b></div>
-      </div>
-    </div>
   </section>
 
   <!-- ================= MỤC 2: BIỂU ĐỒ ================= -->
@@ -187,7 +176,25 @@
     </div>
   </section>
 
-  <!-- ================= MỤC 3: CÀI ĐẶT ================= -->
+  <!-- ================= MỤC 3: TÍNH TIỀN PHÒNG ================= -->
+  <section class="tab" id="tab-calc">
+    <div class="sec-title">Bảng tính tiền phòng</div>
+    <div class="row r1">
+      <div class="card calc">
+        <div class="label" style="color:var(--neon-green);">🧾 Tiền phòng tháng này</div>
+        <div class="calc-row"><span>Tiền trọ</span><input type="number" inputmode="numeric" id="c_tro" placeholder="0"></div>
+        <div class="calc-row"><span>Số nước<small>m³ đã dùng</small></span><input type="number" inputmode="decimal" step="any" id="c_m3" placeholder="0"></div>
+        <div class="calc-row"><span>Giá nước<small>đ cho 1 m³</small></span><input type="number" inputmode="numeric" id="c_gia" placeholder="0"></div>
+        <div class="calc-row"><span>Tiền nước<small>= số m³ × giá nước</small></span><b id="c_nuoc">0 đ</b></div>
+        <div class="calc-row"><span>Tiền điện<small>tháng này, tự lấy từ công tơ</small></span><b id="c_dien">0 đ</b></div>
+        <div class="calc-row"><span>Tiền khác</span><input type="number" inputmode="numeric" id="c_khac" placeholder="0"></div>
+        <div class="calc-total"><span>TỔNG CỘNG</span><b id="c_tong">0 đ</b></div>
+      </div>
+    </div>
+    <div class="calc-note">Tiền điện tự lấy từ công tơ theo kỳ chốt sổ. Các số bạn nhập được lưu trên máy này.</div>
+  </section>
+
+  <!-- ================= MỤC 4: CÀI ĐẶT ================= -->
   <section class="tab" id="tab-setup">
     <div class="sec-title">Tính tiền điện</div>
     <div class="row r1">
@@ -229,6 +236,9 @@
   </button>
   <button data-tab="chart">
     <svg viewBox="0 0 24 24"><path d="M3 20h18M5 16l4-5 4 3 6-8"/></svg><span>Biểu đồ</span>
+  </button>
+  <button data-tab="calc">
+    <svg viewBox="0 0 24 24"><path d="M6 2h12v20l-3-2-3 2-3-2-3 2z"/><path d="M9 7h6M9 11h6M9 15h4"/></svg><span>Tính tiền</span>
   </button>
   <button data-tab="setup">
     <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg><span>Cài đặt</span>
