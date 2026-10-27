@@ -405,7 +405,7 @@
   // Nhận dữ liệu từ ESP32 và đẩy lên giao diện
   let gotData = false;
   let warned = false;
-  let espState = "", espRssi = null, espUptime = null, espRecon = null, espHeap = null, espDrc = 0, espDup = 0, espDout = 0, espRr = null, espRrn = 0;
+  let espState = "", espRssi = null, espUptime = null, espRecon = null, espHeap = null, espDrc = 0, espDup = 0, espDout = 0, espRr = null, espRrn = 0, espWl = 0, espWr = 0;
   const cache = {};
   let lastMsg = 0, lastPow = 0, lastVol = 0;
   const powTimes = [];   // thời điểm các tin công suất đã nhận   // đo độ trễ và chu kỳ dữ liệu từ ESP32
@@ -413,7 +413,7 @@
   const MAP_DATA = { v: "voltage", a: "current", w: "power", hz: "frequency", pf: "pf" };
   const MAP_INFO = { hn: "kwh_homnay", hq: "kwh_homqua", tn: "kwh_thangnay", tt: "kwh_thangtruoc", tong: "kwh_tong",
                      dtn: "tien_thangnay", dtt: "tien_thangtruoc", ngay: "status_ngaychot", gia: "status_dongia",
-                     rssi: "rssi", up: "uptime", rc: "reconnects", heap: "heap", drc: "disc_rc", dup: "disc_up", dout: "disc_out", rr: "reset_reason", rrn: "reset_bad" };
+                     rssi: "rssi", up: "uptime", rc: "reconnects", heap: "heap", drc: "disc_rc", dup: "disc_up", dout: "disc_out", rr: "reset_reason", rrn: "reset_bad", wl: "wifi_lost", wr: "wifi_reason" };
   function onMessageArrived(message) {
     const topic = message.destinationName.replace(TOPIC_PREFIX + "/", "");
     if (topic === "data" || topic === "info") {
@@ -465,6 +465,8 @@
       case "disc_out":   if (live) { espDout = Number(payload); updateEsp(); } break;
       case "reset_reason": if (live) { espRr = Number(payload); updateEsp(); } break;
       case "reset_bad":    if (live) { espRrn = Number(payload); updateEsp(); } break;
+      case "wifi_lost":    if (live) { espWl = Number(payload); updateEsp(); } break;
+      case "wifi_reason":  if (live) { espWr = Number(payload); updateEsp(); } break;
       case "tien_thangnay":   setValue("tien_tn", payload, "đ", true); tienDien = Number(payload) || 0; updateCalc(); if (live) { tienNow = Number(payload); syncMonths(); } break;
       case "tien_thangtruoc": setValue("tien_tt", payload, "đ", true); if (live) { tienPrev = Number(payload); syncMonths(); } break;
       case "status_ngaychot": document.getElementById("lbl_ngay").innerText = payload; chotDay = Number(payload) || 0; if (live) syncMonths(); drawMonths(); break;
@@ -997,6 +999,14 @@
       const bad = [4, 5, 6, 7, 9].includes(espRr);
       html += '<br><span style="color:' + (bad ? '#ff9900' : 'inherit') + '">Khởi động lần này do: ' + (RR[espRr] || ("mã " + espRr)) +
               " · reset lỗi " + espRrn + " lần</span>";
+    }
+    // số lần ESP32 mất WiFi / mất IP từ lúc khởi động và lý do gần nhất
+    if (espWl > 0) {
+      const WR = { 1000: "mất IP (router không gia hạn DHCP)", 2: "hết hạn xác thực", 3: "router chủ động ngắt", 4: "hết hạn liên kết",
+                   5: "router quá nhiều thiết bị", 8: "rời mạng", 15: "bắt tay 4 bước quá hạn (sóng yếu/sai mật khẩu)",
+                   200: "mất tín hiệu router", 201: "không thấy router", 202: "sai mật khẩu WiFi", 203: "liên kết thất bại", 204: "bắt tay quá hạn" };
+      html += '<br><span style="color:#ff9900">Mất WiFi/IP ' + espWl + " lần từ lúc khởi động · lần gần nhất: " +
+              (WR[espWr] || ("mã " + espWr)) + "</span>";
     }
     el.innerHTML = html;
   }
