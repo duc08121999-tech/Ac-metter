@@ -224,6 +224,15 @@
         </div>
       </div>
     </div>
+    <div class="sec-title">Phần mềm ESP32</div>
+    <div class="row r1">
+      <div class="card setting">
+        <div class="label" style="color:var(--neon-orange);">🔄 Cập nhật phần mềm từ xa</div>
+        <div class="set-cur">Phiên bản đang chạy: <b id="fw_ver">--</b></div>
+        <div class="set-cur" id="ota_st" style="margin-top:6px;">Bấm nút để ESP32 tự kiểm tra và tải bản mới (nếu có).</div>
+        <div class="input-group"><button onclick="otaCheck()">Kiểm tra &amp; cập nhật</button></div>
+      </div>
+    </div>
     <div class="sec-title">Trạng thái kết nối</div>
     <div class="row r1">
       <div class="card diag">
@@ -413,7 +422,7 @@
   const MAP_DATA = { v: "voltage", a: "current", w: "power", hz: "frequency", pf: "pf" };
   const MAP_INFO = { hn: "kwh_homnay", hq: "kwh_homqua", tn: "kwh_thangnay", tt: "kwh_thangtruoc", tong: "kwh_tong",
                      dtn: "tien_thangnay", dtt: "tien_thangtruoc", ngay: "status_ngaychot", gia: "status_dongia",
-                     rssi: "rssi", up: "uptime", rc: "reconnects", heap: "heap", drc: "disc_rc", dup: "disc_up", dout: "disc_out", rr: "reset_reason", rrn: "reset_bad", wl: "wifi_lost", wr: "wifi_reason" };
+                     rssi: "rssi", up: "uptime", rc: "reconnects", heap: "heap", drc: "disc_rc", dup: "disc_up", dout: "disc_out", rr: "reset_reason", rrn: "reset_bad", wl: "wifi_lost", wr: "wifi_reason", fw: "fw_version" };
   function onMessageArrived(message) {
     const topic = message.destinationName.replace(TOPIC_PREFIX + "/", "");
     if (topic === "data" || topic === "info") {
@@ -465,6 +474,8 @@
       case "disc_out":   if (live) { espDout = Number(payload); updateEsp(); } break;
       case "reset_reason": if (live) { espRr = Number(payload); updateEsp(); } break;
       case "reset_bad":    if (live) { espRrn = Number(payload); updateEsp(); } break;
+      case "fw_version":   document.getElementById("fw_ver").textContent = "v" + payload; break;
+      case "ota_status":   if (live) document.getElementById("ota_st").textContent = payload; break;
       case "wifi_lost":    if (live) { espWl = Number(payload); updateEsp(); } break;
       case "wifi_reason":  if (live) { espWr = Number(payload); updateEsp(); } break;
       case "tien_thangnay":   setValue("tien_tn", payload, "đ", true); tienDien = Number(payload) || 0; updateCalc(); if (live) { tienNow = Number(payload); syncMonths(); } break;
@@ -472,6 +483,16 @@
       case "status_ngaychot": document.getElementById("lbl_ngay").innerText = payload; chotDay = Number(payload) || 0; if (live) syncMonths(); drawMonths(); break;
       case "status_dongia":   document.getElementById("lbl_gia").innerText = Number(payload).toLocaleString("vi-VN"); break;
     }
+  }
+
+  // Cập nhật phần mềm từ xa: ESP32 tự tải bản mới từ địa chỉ cố định ghi trong code của nó
+  function otaCheck() {
+    if (!client.isConnected()) { alert("Chưa kết nối MQTT, vui lòng đợi kết nối lại!"); return; }
+    if (!confirm("ESP32 sẽ kiểm tra và tự cập nhật nếu có bản mới.\nTrong lúc cập nhật (khoảng 1 phút) sẽ tạm mất dữ liệu. Tiếp tục?")) return;
+    const m = new Paho.MQTT.Message("check");
+    m.destinationName = TOPIC_PREFIX + "/set_ota";
+    client.send(m);
+    document.getElementById("ota_st").textContent = "Đã gửi lệnh, đang chờ ESP32 trả lời...";
   }
 
   // Gửi cấu hình xuống ESP32 (topic: <prefix>/set_ngaychot, <prefix>/set_dongia)
