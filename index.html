@@ -227,10 +227,12 @@
     <div class="sec-title">Phần mềm ESP32</div>
     <div class="row r1">
       <div class="card setting">
-        <div class="label" style="color:var(--neon-orange);">🔄 Cập nhật phần mềm từ xa</div>
+        <div class="label" style="color:var(--neon-orange);">📶 Nạp code qua WiFi (máy tính / điện thoại chung mạng)</div>
         <div class="set-cur">Phiên bản đang chạy: <b id="fw_ver">--</b></div>
-        <div class="set-cur" id="ota_st" style="margin-top:6px;">Bấm nút để ESP32 tự kiểm tra và tải bản mới (nếu có).</div>
-        <div class="input-group"><button onclick="otaCheck()">Kiểm tra &amp; cập nhật</button></div>
+        <div class="set-cur">Chế độ nạp code: <b id="ota_mode">--</b></div>
+        <div class="set-cur" id="ota_addr" style="margin-top:4px;"></div>
+        <div class="set-cur" id="ota_st" style="margin-top:6px;">Tự bật 3 phút sau khi ESP32 khởi động, hoặc bấm nút dưới để bật 10 phút.</div>
+        <div class="input-group"><button onclick="otaLan()">Bật chế độ nạp code (10 phút)</button></div>
       </div>
     </div>
     <div class="sec-title">Trạng thái kết nối</div>
@@ -422,7 +424,7 @@
   const MAP_DATA = { v: "voltage", a: "current", w: "power", hz: "frequency", pf: "pf" };
   const MAP_INFO = { hn: "kwh_homnay", hq: "kwh_homqua", tn: "kwh_thangnay", tt: "kwh_thangtruoc", tong: "kwh_tong",
                      dtn: "tien_thangnay", dtt: "tien_thangtruoc", ngay: "status_ngaychot", gia: "status_dongia",
-                     rssi: "rssi", up: "uptime", rc: "reconnects", heap: "heap", drc: "disc_rc", dup: "disc_up", dout: "disc_out", rr: "reset_reason", rrn: "reset_bad", wl: "wifi_lost", wr: "wifi_reason", fw: "fw_version" };
+                     rssi: "rssi", up: "uptime", rc: "reconnects", heap: "heap", drc: "disc_rc", dup: "disc_up", dout: "disc_out", rr: "reset_reason", rrn: "reset_bad", wl: "wifi_lost", wr: "wifi_reason", fw: "fw_version", ip: "esp_ip", ota: "ota_min" };
   function onMessageArrived(message) {
     const topic = message.destinationName.replace(TOPIC_PREFIX + "/", "");
     if (topic === "data" || topic === "info") {
@@ -476,6 +478,8 @@
       case "reset_bad":    if (live) { espRrn = Number(payload); updateEsp(); } break;
       case "fw_version":   document.getElementById("fw_ver").textContent = "v" + payload; break;
       case "ota_status":   if (live) document.getElementById("ota_st").textContent = payload; break;
+      case "esp_ip":       espIp = payload; showOta(); break;
+      case "ota_min":      if (live) { otaMin = Number(payload) || 0; showOta(); } break;
       case "wifi_lost":    if (live) { espWl = Number(payload); updateEsp(); } break;
       case "wifi_reason":  if (live) { espWr = Number(payload); updateEsp(); } break;
       case "tien_thangnay":   setValue("tien_tn", payload, "đ", true); tienDien = Number(payload) || 0; updateCalc(); if (live) { tienNow = Number(payload); syncMonths(); } break;
@@ -485,14 +489,20 @@
     }
   }
 
-  // Cập nhật phần mềm từ xa: ESP32 tự tải bản mới từ địa chỉ cố định ghi trong code của nó
-  function otaCheck() {
+  // Nạp code qua WiFi: web chỉ ra lệnh bật cổng nạp code trên ESP32 trong 10 phút
+  let espIp = "", otaMin = 0;
+  function showOta() {
+    const m = document.getElementById("ota_mode"), a = document.getElementById("ota_addr");
+    m.textContent = otaMin > 0 ? "ĐANG BẬT (còn khoảng " + otaMin + " phút)" : "đang tắt";
+    m.style.color = otaMin > 0 ? "var(--neon-green)" : "";
+    a.innerHTML = espIp ? "Địa chỉ nạp: Arduino IDE → Tools → Port → <b>giamsatdien</b>, hoặc trình duyệt mở <b>http://" + espIp + "/update</b>" : "";
+  }
+  function otaLan() {
     if (!client.isConnected()) { alert("Chưa kết nối MQTT, vui lòng đợi kết nối lại!"); return; }
-    if (!confirm("ESP32 sẽ kiểm tra và tự cập nhật nếu có bản mới.\nTrong lúc cập nhật (khoảng 1 phút) sẽ tạm mất dữ liệu. Tiếp tục?")) return;
-    const m = new Paho.MQTT.Message("check");
+    const m = new Paho.MQTT.Message("lan");
     m.destinationName = TOPIC_PREFIX + "/set_ota";
     client.send(m);
-    document.getElementById("ota_st").textContent = "Đã gửi lệnh, đang chờ ESP32 trả lời...";
+    document.getElementById("ota_st").textContent = "Đã gửi lệnh, đang chờ ESP32 bật chế độ nạp code...";
   }
 
   // Gửi cấu hình xuống ESP32 (topic: <prefix>/set_ngaychot, <prefix>/set_dongia)
