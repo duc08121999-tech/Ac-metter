@@ -498,7 +498,14 @@
     const btn = document.getElementById("ota_btn");
     btn.textContent = otaMin > 0 ? "Tắt chế độ nạp code" : "Bật chế độ nạp code";
     btn.style.background = otaMin > 0 ? "var(--neon-red)" : "";
-    a.innerHTML = espIp ? "Địa chỉ nạp: Arduino IDE → Tools → Port → <b>giamsatdien</b>, hoặc trình duyệt mở <b>http://" + espIp + "/update</b>" : "";
+    // chỉ hiện địa chỉ khi chế độ nạp đang BẬT (lúc tắt, ESP32 không mở trang /update nên vào sẽ không được)
+    if (otaMin > 0 && espIp) {
+      const u = "http://" + espIp + "/update";
+      a.innerHTML = "Nạp bằng trình duyệt: <a href='" + u + "' target='_blank' style='color:var(--neon-cyan);font-weight:bold'>" + u + "</a>" +
+                    "<br>Hoặc Arduino IDE → Tools → Port → <b>giamsatdien at " + espIp + "</b>";
+    } else {
+      a.textContent = "Bấm \"Bật chế độ nạp code\" trước, rồi mới vào địa chỉ nạp.";
+    }
   }
   function otaLan() {
     if (!client.isConnected()) { alert("Chưa kết nối MQTT, vui lòng đợi kết nối lại!"); return; }
