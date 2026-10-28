@@ -231,8 +231,8 @@
         <div class="set-cur">Phiên bản đang chạy: <b id="fw_ver">--</b></div>
         <div class="set-cur">Chế độ nạp code: <b id="ota_mode">--</b></div>
         <div class="set-cur" id="ota_addr" style="margin-top:4px;"></div>
-        <div class="set-cur" id="ota_st" style="margin-top:6px;">Tự bật 3 phút sau khi ESP32 khởi động, hoặc bấm nút dưới để bật 10 phút.</div>
-        <div class="input-group"><button onclick="otaLan()">Bật chế độ nạp code (10 phút)</button></div>
+        <div class="set-cur" id="ota_st" style="margin-top:6px;">Bấm nút dưới để bật. Nạp xong ESP32 khởi động lại và tự tắt (không nạp thì 10 phút tự tắt).</div>
+        <div class="input-group"><button id="ota_btn" onclick="otaLan()">Bật chế độ nạp code</button></div>
       </div>
     </div>
     <div class="sec-title">Trạng thái kết nối</div>
@@ -493,16 +493,22 @@
   let espIp = "", otaMin = 0;
   function showOta() {
     const m = document.getElementById("ota_mode"), a = document.getElementById("ota_addr");
-    m.textContent = otaMin > 0 ? "ĐANG BẬT (còn khoảng " + otaMin + " phút)" : "đang tắt";
+    m.textContent = otaMin > 0 ? "ĐANG BẬT (tự tắt sau khoảng " + otaMin + " phút nếu không nạp)" : "đang tắt";
     m.style.color = otaMin > 0 ? "var(--neon-green)" : "";
+    const btn = document.getElementById("ota_btn");
+    btn.textContent = otaMin > 0 ? "Tắt chế độ nạp code" : "Bật chế độ nạp code";
+    btn.style.background = otaMin > 0 ? "var(--neon-red)" : "";
     a.innerHTML = espIp ? "Địa chỉ nạp: Arduino IDE → Tools → Port → <b>giamsatdien</b>, hoặc trình duyệt mở <b>http://" + espIp + "/update</b>" : "";
   }
   function otaLan() {
     if (!client.isConnected()) { alert("Chưa kết nối MQTT, vui lòng đợi kết nối lại!"); return; }
-    const m = new Paho.MQTT.Message("lan");
+    const turnOn = !(otaMin > 0);
+    const m = new Paho.MQTT.Message(turnOn ? "lan" : "off");
     m.destinationName = TOPIC_PREFIX + "/set_ota";
     client.send(m);
-    document.getElementById("ota_st").textContent = "Đã gửi lệnh, đang chờ ESP32 bật chế độ nạp code...";
+    otaMin = turnOn ? 10 : 0;                     // hiện ngay, số liệu thật từ ESP32 sẽ cập nhật lại sau vài giây
+    showOta();
+    document.getElementById("ota_st").textContent = turnOn ? "Đã gửi lệnh bật, đang chờ ESP32..." : "Đã gửi lệnh tắt, đang chờ ESP32...";
   }
 
   // Gửi cấu hình xuống ESP32 (topic: <prefix>/set_ngaychot, <prefix>/set_dongia)
