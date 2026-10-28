@@ -501,11 +501,18 @@
     // chỉ hiện địa chỉ khi chế độ nạp đang BẬT (lúc tắt, ESP32 không mở trang /update nên vào sẽ không được)
     if (otaMin > 0 && espIp) {
       const u = "http://" + espIp + "/update";
-      a.innerHTML = "Nạp bằng trình duyệt: <a href='" + u + "' target='_blank' style='color:var(--neon-cyan);font-weight:bold'>" + u + "</a>" +
+      // mở bằng Safari riêng (không mở trong app trên màn hình chính, tránh bị kẹt không quay lại được)
+      a.innerHTML = "Nạp bằng trình duyệt: <b>" + u + "</b> " +
+                    "<button type='button' onclick='otaOpen()' style='margin:6px 0 2px;padding:6px 10px;font-size:13px;background:var(--neon-cyan)'>Mở trang nạp code</button>" +
                     "<br>Hoặc Arduino IDE → Tools → Port → <b>giamsatdien at " + espIp + "</b>";
     } else {
       a.textContent = "Bấm \"Bật chế độ nạp code\" trước, rồi mới vào địa chỉ nạp.";
     }
+  }
+  function otaOpen() {
+    const u = "http://" + espIp + "/update";
+    const w = window.open(u, "_blank");                  // iPhone: mở trong Safari, app này vẫn giữ nguyên
+    if (!w) prompt("Chép địa chỉ này và dán vào Safari:", u);
   }
   function otaLan() {
     if (!client.isConnected()) { alert("Chưa kết nối MQTT, vui lòng đợi kết nối lại!"); return; }
