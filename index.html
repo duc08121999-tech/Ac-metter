@@ -66,8 +66,9 @@
     .set-cur { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
     .set-cur b { color: var(--text-main); }
     .input-group { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
-    input[type=number] { width: 100%; background: #0a0f1d; border: 1px solid var(--line); padding: 9px; color: #fff; font-size: 16px; border-radius: 6px; text-align: center; outline: none; }
-    input[type=number]:focus { border-color: var(--neon-cyan); }
+    input[type=number], input[type=time] { width: 100%; background: #0a0f1d; border: 1px solid var(--line); padding: 9px; color: #fff; font-size: 16px; border-radius: 6px; text-align: center; outline: none; }
+    input[type=time] { color-scheme: dark; min-height: 40px; }
+    input[type=number]:focus, input[type=time]:focus { border-color: var(--neon-cyan); }
     button { padding: 9px 8px; font-size: 14px; background: var(--neon-orange); color: #000; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
     button:active { background: #ffaa22; }
 
@@ -80,6 +81,7 @@
     .calc-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
     .calc-row small { display: block; color: var(--text-muted); font-size: 11px; }
     .calc-row input { width: 52%; text-align: right; }
+    .calc-row select { width: 52%; background: #0a0f1d; border: 1px solid var(--line); padding: 9px; color: #fff; font-size: 15px; border-radius: 6px; outline: none; color-scheme: dark; }
     .calc-row b { color: var(--neon-green); font-size: 16px; font-variant-numeric: tabular-nums; }
     .calc-total { display: flex; justify-content: space-between; align-items: baseline; padding-top: 12px; }
     .calc-total span { font-weight: 700; letter-spacing: .5px; }
@@ -181,6 +183,15 @@
       </div>
       <canvas id="monthChart"></canvas>
     </div>
+    <div class="card setting" id="mEdit" style="display:none;margin-top:8px;">
+      <div class="set-cur">Sửa cột <b id="mEditLbl"></b></div>
+      <div class="input-group row-input">
+        <input type="number" id="mEditVal" inputmode="numeric" placeholder="Số tiền (đ)">
+        <button onclick="monthSave(false)">Lưu</button>
+      </div>
+      <div class="input-group"><button id="mMergeBtn" onclick="monthMerge()" style="background:var(--neon-cyan)">Gộp vào tháng sau</button></div>
+      <div class="input-group"><button onclick="monthSave(true)" style="background:var(--neon-red)">Xoá cột này</button></div>
+    </div>
   </section>
 
   <!-- ================= MỤC 3: TÍNH TIỀN PHÒNG ================= -->
@@ -193,7 +204,8 @@
         <div class="calc-row"><span>Số nước<small>m³ đã dùng</small></span><input type="number" inputmode="decimal" step="any" id="c_m3" placeholder="0"></div>
         <div class="calc-row"><span>Giá nước<small>đ cho 1 m³</small></span><input type="number" inputmode="numeric" id="c_gia" placeholder="0"></div>
         <div class="calc-row"><span>Tiền nước<small>= số m³ × giá nước</small></span><b id="c_nuoc">0 đ</b></div>
-        <div class="calc-row"><span>Tiền điện<small>tháng này, tự lấy từ công tơ</small></span><b id="c_dien">0 đ</b></div>
+        <div class="calc-row"><span>Tháng tính tiền<small>chọn tháng lấy tiền điện</small></span><select id="c_thang"></select></div>
+        <div class="calc-row"><span>Tiền điện<small id="c_dien_note">tháng này, tự lấy từ công tơ</small></span><b id="c_dien">0 đ</b></div>
         <div class="calc-row"><span>Tiền khác</span><input type="number" inputmode="numeric" id="c_khac" placeholder="0"></div>
         <div class="calc-total"><span>TỔNG CỘNG</span><b id="c_tong">0 đ</b></div>
       </div>
@@ -216,11 +228,32 @@
     </div>
     <div class="row r1">
       <div class="card setting">
+        <div class="label" style="color:var(--neon-orange);">⏰ Giờ chốt sổ tháng</div>
+        <div class="set-cur">Hiện tại: <b id="lbl_gio">--</b> (chốt vào ngày chốt sổ, đúng giờ này)</div>
+        <div class="input-group row-input">
+          <input type="time" id="input_gio" value="00:00" step="60">
+          <button onclick="publishGio()">Cập nhật</button>
+        </div>
+      </div>
+    </div>
+    <div class="row r1">
+      <div class="card setting">
         <div class="label" style="color:var(--neon-orange);">💰 Đơn giá điện</div>
         <div class="set-cur">Hiện tại: <b id="lbl_gia">--</b> đ/kWh</div>
         <div class="input-group row-input">
           <input type="number" id="input_gia" value="3500" inputmode="numeric">
           <button onclick="publishSetting('set_dongia', 'input_gia')">Cập nhật</button>
+        </div>
+      </div>
+    </div>
+    <div class="row r1">
+      <div class="card setting">
+        <div class="label" style="color:var(--neon-orange);">🛠 Sửa tiền điện tháng trước</div>
+        <div class="set-cur" id="fix_info">Đang chờ số liệu từ ESP32...</div>
+        <div class="set-cur" style="margin-top:6px;">Nhập lại tiền điện đúng của tháng trước (muốn gộp tiền một tháng cũ vào tháng sau: vào Biểu đồ, chạm cột tháng đó).</div>
+        <div class="input-group row-input">
+          <input type="number" id="input_tt" inputmode="numeric" placeholder="Tiền tháng trước (đ)">
+          <button onclick="fixPrev()">Lưu</button>
         </div>
       </div>
     </div>
@@ -424,7 +457,8 @@
   const MAP_DATA = { v: "voltage", a: "current", w: "power", hz: "frequency", pf: "pf" };
   const MAP_INFO = { hn: "kwh_homnay", hq: "kwh_homqua", tn: "kwh_thangnay", tt: "kwh_thangtruoc", tong: "kwh_tong",
                      dtn: "tien_thangnay", dtt: "tien_thangtruoc", ngay: "status_ngaychot", gia: "status_dongia",
-                     rssi: "rssi", up: "uptime", rc: "reconnects", heap: "heap", drc: "disc_rc", dup: "disc_up", dout: "disc_out", rr: "reset_reason", rrn: "reset_bad", wl: "wifi_lost", wr: "wifi_reason", fw: "fw_version", ip: "esp_ip", ota: "ota_min" };
+                     rssi: "rssi", up: "uptime", rc: "reconnects", heap: "heap", drc: "disc_rc", dup: "disc_up", dout: "disc_out", rr: "reset_reason", rrn: "reset_bad", wl: "wifi_lost", wr: "wifi_reason", fw: "fw_version", ip: "esp_ip", ota: "ota_min",
+                     gc: "gio_chot", ky: "ky_chot", cr: "cs_thangroi", ct: "cs_thangtruoc" };
   function onMessageArrived(message) {
     const topic = message.destinationName.replace(TOPIC_PREFIX + "/", "");
     if (topic === "data" || topic === "info") {
@@ -485,7 +519,23 @@
       case "tien_thangnay":   setValue("tien_tn", payload, "đ", true); tienDien = Number(payload) || 0; updateCalc(); if (live) { tienNow = Number(payload); syncMonths(); } break;
       case "tien_thangtruoc": setValue("tien_tt", payload, "đ", true); if (live) { tienPrev = Number(payload); syncMonths(); } break;
       case "status_ngaychot": document.getElementById("lbl_ngay").innerText = payload; chotDay = Number(payload) || 0; if (live) syncMonths(); drawMonths(); break;
-      case "status_dongia":   document.getElementById("lbl_gia").innerText = Number(payload).toLocaleString("vi-VN"); break;
+      case "status_dongia":   document.getElementById("lbl_gia").innerText = Number(payload).toLocaleString("vi-VN"); giaDien = Number(payload) || 0; showFix(); break;
+      case "gio_chot": {
+        const m = Number(payload) || 0;
+        const hm = String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0");
+        document.getElementById("lbl_gio").innerText = hm;
+        const gi = document.getElementById("input_gio");
+        if (document.activeElement !== gi && gi.dataset.set !== hm) { gi.value = hm; gi.dataset.set = hm; }
+        break;
+      }
+      case "ky_chot": {                                  // tháng ESP32 chốt sổ gần nhất (yyyymm) = kỳ tiền điện hiện tại
+        const k = Number(payload) || 0;
+        const nk = k > 200000 ? Math.floor(k / 100) + "-" + String(k % 100).padStart(2, "0") : null;
+        if (nk !== kyKey) { kyKey = nk; if (live) syncMonths(); drawMonths(); }
+        break;
+      }
+      case "cs_thangroi":   csRoi = Number(payload); showFix(); break;
+      case "cs_thangtruoc": csTruoc = Number(payload); showFix(); break;
     }
   }
 
@@ -523,6 +573,32 @@
     otaMin = turnOn ? 10 : 0;                     // hiện ngay, số liệu thật từ ESP32 sẽ cập nhật lại sau vài giây
     showOta();
     document.getElementById("ota_st").textContent = turnOn ? "Đã gửi lệnh bật, đang chờ ESP32..." : "Đã gửi lệnh tắt, đang chờ ESP32...";
+  }
+
+  function sendCmd(sub, val) {
+    if (!client.isConnected()) { alert("Chưa kết nối MQTT, vui lòng đợi kết nối lại!"); return false; }
+    const m = new Paho.MQTT.Message(String(val));
+    m.destinationName = TOPIC_PREFIX + "/" + sub;
+    client.send(m);
+    return true;
+  }
+  function publishGio() {
+    const v = document.getElementById("input_gio").value;            // "HH:MM"
+    if (!/^\d{1,2}:\d{2}$/.test(v)) { alert("Vui lòng chọn giờ hợp lệ!"); return; }
+    if (sendCmd("set_giochot", v)) alert("✔️ Đã gửi giờ chốt sổ: " + v);
+  }
+  function showFix() {
+    const el = document.getElementById("fix_info");
+    if (!el || isNaN(csRoi) || isNaN(csTruoc)) return;
+    const f = n => n.toLocaleString("vi-VN", { maximumFractionDigits: 2 });
+    el.innerHTML = "Chỉ số lúc chốt tháng này: <b>" + f(csRoi) + " kWh</b> · lúc chốt tháng trước: <b>" + f(csTruoc) + " kWh</b>" +
+                   " → tháng trước dùng <b>" + f(Math.abs(csRoi - csTruoc)) + " kWh</b>";
+  }
+  function fixPrev() {
+    const v = Math.round(Number(document.getElementById("input_tt").value));
+    if (!(v >= 0) || document.getElementById("input_tt").value === "") { alert("Vui lòng nhập số tiền hợp lệ!"); return; }
+    if (!confirm("Đặt tiền điện tháng trước = " + v.toLocaleString("vi-VN") + " đ" + (giaDien ? " (" + (v / giaDien).toFixed(2) + " kWh)" : "") + "?")) return;
+    if (sendCmd("set_tien_tt", v)) alert("✔️ Đã gửi. Biểu đồ tiền điện tháng trước sẽ tự cập nhật.");
   }
 
   // Gửi cấu hình xuống ESP32 (topic: <prefix>/set_ngaychot, <prefix>/set_dongia)
@@ -775,6 +851,8 @@
   const MKEY = "pzem_months_" + TOPIC_PREFIX;
   const CKEY = "pzem_calc_" + TOPIC_PREFIX;
   let chotDay = 0, tienNow = null, tienPrev = null, tienDien = 0, selKey = null;
+  let kyKey = null;        // kỳ hiện tại do ESP32 báo (bản 1.2 trở lên): không phụ thuộc ngày chốt đang đặt
+  let giaDien = 0, csRoi = NaN, csTruoc = NaN;
   let monthHist = {};      // {"2026-10": 42091, ...} lưu trong trình duyệt
   try { monthHist = JSON.parse(localStorage.getItem(MKEY) || "{}") || {}; } catch (err) { monthHist = {}; }
 
@@ -785,6 +863,7 @@
     if (chot > 1 && d.getDate() < chot) { m--; if (m < 0) { m = 11; y--; } }
     return keyOf(y, m);
   }
+  function curPeriod() { return kyKey || periodKey(new Date(), chotDay || 1); }
   function shiftKey(key, delta) {
     let y = Number(key.slice(0, 4)), m = Number(key.slice(5, 7)) - 1 + delta;
     while (m < 0) { m += 12; y--; }
@@ -794,8 +873,8 @@
 
   // ghi nhận tiền điện của kỳ này và kỳ trước từ dữ liệu trực tiếp của ESP32
   function syncMonths() {
-    if (!chotDay) return;                       // chưa biết ngày chốt thì chưa xếp được tháng
-    const cur = periodKey(new Date(), chotDay);
+    if (!kyKey && !chotDay) return;             // chưa biết kỳ / ngày chốt thì chưa xếp được tháng
+    const cur = curPeriod();
     let changed = false;
     if (tienNow !== null && !isNaN(tienNow) && monthHist[cur] !== tienNow) { monthHist[cur] = tienNow; changed = true; }
     if (tienPrev !== null && !isNaN(tienPrev) && tienPrev > 0) {
@@ -837,6 +916,7 @@
   markMonthRange();
   let mBars = [];
   function drawMonths() {
+    try { fillCalcMonths(); updateCalc(); } catch (e) {}       // danh sách tháng ở mục Tính tiền (lúc trang đang tải thì bỏ qua)
     const box = mCanvas.parentElement;
     const dpr = window.devicePixelRatio || 1;
     const W = box.clientWidth - 28, H = box.clientHeight - 28 - mrangeEl.offsetHeight - 6;
@@ -851,7 +931,7 @@
     mBars = [];
 
     // các tháng hiển thị: monthN tháng kết thúc ở kỳ hiện tại (tháng chưa có dữ liệu để trống)
-    const cur = periodKey(new Date(), chotDay || 1);
+    const cur = curPeriod();
     const n = monthN;
     const keys = [];
     for (let i = n - 1; i >= 0; i--) keys.push(shiftKey(cur, -i));
@@ -920,17 +1000,82 @@
     const hit = mBars.find(b => x >= b.x0 && x <= b.x1);
     selKey = (hit && hit.key !== selKey) ? hit.key : null;
     drawMonths();
+    showMonthEdit();
   });
+  // chọn một cột: sửa hoặc xoá số liệu của tháng đó (lưu trên máy này)
+  function showMonthEdit() {
+    const box = document.getElementById("mEdit");
+    if (!selKey) { box.style.display = "none"; return; }
+    const lbl = "T" + Number(selKey.slice(5)) + "/" + selKey.slice(0, 4);
+    const cur = curPeriod();
+    document.getElementById("mEditLbl").textContent = lbl + (selKey === cur ? " (tháng này, tự cập nhật)" : (selKey === shiftKey(cur, -1) ? " (tháng trước, tự cập nhật)" : ""));
+    document.getElementById("mEditVal").value = monthHist[selKey] !== undefined ? Math.round(monthHist[selKey]) : "";
+    const nk = shiftKey(selKey, 1), mb = document.getElementById("mMergeBtn");
+    // gộp được khi cột này đã xong (không phải tháng này / tháng trước) và tháng sau không phải tháng đang tính
+    const can = monthHist[selKey] !== undefined && selKey < shiftKey(cur, -1);
+    mb.style.display = can ? "" : "none";
+    mb.textContent = "Gộp tiền " + lbl + " vào T" + Number(nk.slice(5)) + "/" + nk.slice(0, 4);
+    box.style.display = "";
+  }
+  // cộng tiền tháng đã chọn vào tháng sau rồi xoá cột này (tháng sau là tháng trước thì sửa luôn trên ESP32)
+  function monthMerge() {
+    if (!selKey || monthHist[selKey] === undefined) return;
+    const cur = curPeriod(), prev = shiftKey(cur, -1), nk = shiftKey(selKey, 1);
+    const a = monthHist[selKey], live = nk === prev;
+    const b = live ? (tienPrev !== null && !isNaN(tienPrev) ? tienPrev : (monthHist[nk] || 0)) : (monthHist[nk] || 0);
+    const t = (k => "T" + Number(k.slice(5)) + "/" + k.slice(0, 4));
+    if (!confirm("Gộp tiền " + t(selKey) + " vào " + t(nk) + "?\n" + t(nk) + " = " + fmtMoney(b) + " + " + fmtMoney(a) + " = " + fmtMoney(a + b) +
+                 "\nCột " + t(selKey) + " sẽ bị xoá." + (live ? "\n(Tháng trước trên ESP32 cũng được sửa theo.)" : ""))) return;
+    if (live && !sendCmd("set_tien_tt", Math.round(a + b))) return;
+    monthHist[nk] = a + b;
+    if (live) tienPrev = a + b;
+    delete monthHist[selKey];
+    try { localStorage.setItem(MKEY, JSON.stringify(monthHist)); } catch (err) {}
+    selKey = null;
+    drawMonths();
+    showMonthEdit();
+  }
+  function monthSave(del) {
+    if (!selKey) return;
+    if (del) {
+      if (!confirm("Xoá số liệu tháng T" + Number(selKey.slice(5)) + "/" + selKey.slice(0, 4) + "?")) return;
+      delete monthHist[selKey];
+    } else {
+      const v = Number(document.getElementById("mEditVal").value);
+      if (isNaN(v) || v < 0) { alert("Vui lòng nhập số tiền hợp lệ!"); return; }
+      monthHist[selKey] = v;
+    }
+    try { localStorage.setItem(MKEY, JSON.stringify(monthHist)); } catch (err) {}
+    selKey = null;
+    drawMonths();
+    showMonthEdit();
+  }
   window.addEventListener("resize", drawMonths);
 
   // ---- bảng tính tiền phòng: nhập tay trọ, nước, khác; tiền điện tự lấy; tổng tự cộng ----
   const calcIds = ["c_tro", "c_m3", "c_gia", "c_khac"];
+  // chọn tháng lấy tiền điện: tháng đang tính (số trực tiếp từ công tơ) hoặc các tháng đã lưu trong biểu đồ
+  const calcSel = document.getElementById("c_thang");
+  let calcMonth = "";                                          // "" = tháng đang tính
+  function fillCalcMonths() {
+    const cur = (kyKey || chotDay) ? curPeriod() : "";
+    const t = (k => "Tháng " + Number(k.slice(5)) + "/" + k.slice(0, 4));
+    const keys = Object.keys(monthHist).filter(k => k !== cur).sort().reverse();
+    let html = '<option value="">' + (cur ? t(cur) + " (này)" : "Tháng này") + "</option>";
+    keys.forEach(k => { html += '<option value="' + k + '">' + t(k) + "</option>"; });
+    if (calcSel.innerHTML !== html) calcSel.innerHTML = html;
+    if (calcMonth && monthHist[calcMonth] === undefined) calcMonth = "";
+    calcSel.value = calcMonth;
+  }
+  calcSel.addEventListener("change", function () { calcMonth = calcSel.value; updateCalc(); });
   function updateCalc() {
     const g = id => Math.max(0, Number(document.getElementById(id).value) || 0);
     const nuoc = Math.round(g("c_m3") * g("c_gia"));          // tiền nước = số m³ × giá 1 m³
+    const dien = calcMonth ? (monthHist[calcMonth] || 0) : tienDien;
+    document.getElementById("c_dien_note").textContent = calcMonth ? "tháng " + Number(calcMonth.slice(5)) + "/" + calcMonth.slice(0, 4) + ", đã chốt" : "tháng này, tự lấy từ công tơ";
     document.getElementById("c_nuoc").textContent = fmtMoney(nuoc);
-    document.getElementById("c_dien").textContent = fmtMoney(tienDien);
-    document.getElementById("c_tong").textContent = fmtMoney(g("c_tro") + nuoc + g("c_khac") + tienDien);
+    document.getElementById("c_dien").textContent = fmtMoney(dien);
+    document.getElementById("c_tong").textContent = fmtMoney(g("c_tro") + nuoc + g("c_khac") + dien);
   }
   calcIds.forEach(function (id) {
     document.getElementById(id).addEventListener("input", function () {
