@@ -76,6 +76,22 @@
     .chart-box canvas { display: block; }
     .chart-box + .row { margin-top: 10px; }
     .month-box { background: var(--card-bg); padding: 14px; border-radius: 12px; border: 1px solid var(--line); height: 300px; overflow: hidden; }
+    .day-box { background: var(--card-bg); padding: 12px; border-radius: 12px; border: 1px solid var(--line); }
+    .day-box select { width: 100%; background: #0a0f1d; border: 1px solid var(--line); padding: 9px; color: #fff; font-size: 15px; border-radius: 6px; outline: none; color-scheme: dark; }
+    .day-sum { margin: 10px 2px 4px; color: var(--neon-yellow, #ffd400); font-weight: 600; font-size: 14px; }
+    .day-list { max-height: 420px; overflow-y: auto; }
+    .day-row { position: relative; display: flex; align-items: center; gap: 8px; padding: 8px 10px; margin-top: 6px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+    .day-row.live { border-color: var(--neon-green); }
+    .day-bar { position: absolute; left: 0; top: 0; bottom: 0; background: rgba(0, 229, 255, .13); }
+    .day-row.live .day-bar { background: rgba(0, 255, 102, .13); }
+    .day-row span { position: relative; }
+    .day-d { font-weight: 600; min-width: 74px; }
+    .day-d.sun { color: #ff5c7a; }
+    .day-t { color: var(--neon-green); font-size: 12px; }
+    .day-k { margin-left: auto; color: #8a96b3; font-size: 13px; }
+    .day-m { min-width: 84px; text-align: right; font-weight: 700; color: #ffd400; }
+    .day-row.live .day-m { color: var(--neon-green); }
+    .day-empty { color: #8a96b3; text-align: center; padding: 18px 0; font-size: 14px; }
     .month-box canvas { display: block; }
     .card.calc::before { background: var(--neon-green); }
     .calc-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
@@ -191,6 +207,12 @@
       </div>
       <div class="input-group"><button id="mMergeBtn" onclick="monthMerge()" style="background:var(--neon-cyan)">Gộp vào tháng sau</button></div>
       <div class="input-group"><button onclick="monthSave(true)" style="background:var(--neon-red)">Xoá cột này</button></div>
+    </div>
+    <div class="sec-title">Tiền điện từng ngày</div>
+    <div class="day-box">
+      <select id="dSel"></select>
+      <div class="day-sum" id="dSum"></div>
+      <div class="day-list" id="dList"><div class="day-empty">Đang chờ số liệu từ ESP32...</div></div>
     </div>
   </section>
 
@@ -461,6 +483,7 @@
                      gc: "gio_chot", ky: "ky_chot", cr: "cs_thangroi", ct: "cs_thangtruoc" };
   function onMessageArrived(message) {
     const topic = message.destinationName.replace(TOPIC_PREFIX + "/", "");
+    if (topic.indexOf("days/") === 0) { dayIngest(topic.slice(5), message.payloadString); return; }   // tiền từng ngày của 1 kỳ
     if (topic === "data" || topic === "info") {
       let obj = null;
       try { obj = JSON.parse(message.payloadString); } catch (err) { return; }
@@ -495,7 +518,7 @@
         break;
       case "frequency": setValue("hz", payload, "Hz"); break;
       case "pf":        setValue("pf", payload, ""); break;
-      case "kwh_homnay":      setValue("kwh_hn", payload, "kWh"); break;
+      case "kwh_homnay":      setValue("kwh_hn", payload, "kWh"); dayToday = Number(payload); try { dayRender(); } catch (e) {} break;
       case "kwh_homqua":      setValue("kwh_hq", payload, "kWh"); break;
       case "kwh_thangnay":    setValue("kwh_tn", payload, "kWh"); break;
       case "kwh_thangtruoc":  setValue("kwh_tt", payload, "kWh"); break;
@@ -519,7 +542,7 @@
       case "tien_thangnay":   setValue("tien_tn", payload, "đ", true); tienDien = Number(payload) || 0; updateCalc(); if (live) { tienNow = Number(payload); syncMonths(); } break;
       case "tien_thangtruoc": setValue("tien_tt", payload, "đ", true); if (live) { tienPrev = Number(payload); syncMonths(); } break;
       case "status_ngaychot": document.getElementById("lbl_ngay").innerText = payload; chotDay = Number(payload) || 0; if (live) syncMonths(); drawMonths(); break;
-      case "status_dongia":   document.getElementById("lbl_gia").innerText = Number(payload).toLocaleString("vi-VN"); giaDien = Number(payload) || 0; showFix(); break;
+      case "status_dongia":   document.getElementById("lbl_gia").innerText = Number(payload).toLocaleString("vi-VN"); giaDien = Number(payload) || 0; showFix(); try { dayRender(); } catch (e) {} break;
       case "gio_chot": {
         const m = Number(payload) || 0;
         const hm = String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0");
@@ -531,7 +554,7 @@
       case "ky_chot": {                                  // tháng ESP32 chốt sổ gần nhất (yyyymm) = kỳ tiền điện hiện tại
         const k = Number(payload) || 0;
         const nk = k > 200000 ? Math.floor(k / 100) + "-" + String(k % 100).padStart(2, "0") : null;
-        if (nk !== kyKey) { kyKey = nk; if (live) syncMonths(); drawMonths(); }
+        if (nk !== kyKey) { kyKey = nk; if (live) syncMonths(); drawMonths(); try { dayRender(); } catch (e) {} }
         break;
       }
       case "cs_thangroi":   csRoi = Number(payload); showFix(); break;
@@ -1264,6 +1287,64 @@
   if ("serviceWorker" in navigator && location.protocol === "https:") {
     navigator.serviceWorker.register("sw.js").catch(function () {});
   }
+  // ================= TIỀN ĐIỆN TỪNG NGÀY (theo kỳ chốt sổ) =================
+  // ESP32 gửi mỗi kỳ vào topic <prefix>/days/<yyyymm> (giữ trên broker): {"ky":202611,"d":[[20261104,3.214],...]}
+  // Hôm nay (đang tính) lấy từ số kWh hôm nay. Tiền = kWh x đơn giá hiện tại. Lưu thêm trên máy để xem lúc mất mạng.
+  const DKEY = "pzem_days_" + TOPIC_PREFIX;
+  let dayData = {};
+  try { dayData = JSON.parse(localStorage.getItem(DKEY) || "{}") || {}; } catch (e) { dayData = {}; }
+  let dayToday = NaN, daySel = "", dayLastHtml = "";
+  const daySelEl = document.getElementById("dSel");
+  daySelEl.addEventListener("change", function () { daySel = daySelEl.value; dayRender(); });
+  function dayIngest(ky, payload) {
+    if (!/^\d{6}$/.test(ky)) return;
+    if (!payload) delete dayData[ky];
+    else {
+      let o = null;
+      try { o = JSON.parse(payload); } catch (e) { return; }
+      if (!o || !Array.isArray(o.d)) return;
+      dayData[ky] = o.d;
+    }
+    try { localStorage.setItem(DKEY, JSON.stringify(dayData)); } catch (e) {}
+    dayRender();
+  }
+  function dayCurKy() { return kyKey ? kyKey.replace("-", "") : ""; }
+  function dayRender() {
+    const cur = dayCurKy();
+    const kys = Object.keys(dayData);
+    if (cur && kys.indexOf(cur) < 0) kys.push(cur);
+    kys.sort().reverse();
+    if (!daySel || kys.indexOf(daySel) < 0) daySel = cur || kys[0] || "";
+    const lab = k => "Kỳ tháng " + Number(k.slice(4)) + "/" + k.slice(0, 4) + (k === cur ? " (đang tính)" : "");
+    let opt = kys.map(k => '<option value="' + k + '">' + lab(k) + "</option>").join("");
+    if (!kys.length) opt = '<option value="">Chưa có số liệu</option>';
+    if (daySelEl.innerHTML !== opt) daySelEl.innerHTML = opt;
+    daySelEl.value = daySel;
+    // các ngày của kỳ đang chọn, mới nhất ở trên
+    let rows = (dayData[daySel] || []).map(r => ({ d: r[0], k: Number(r[1]) || 0, live: false }));
+    if (daySel && daySel === cur && !isNaN(dayToday)) {
+      const t = new Date(), d = t.getFullYear() * 10000 + (t.getMonth() + 1) * 100 + t.getDate();
+      rows = rows.filter(r => r.d !== d);
+      rows.push({ d: d, k: dayToday, live: true });
+    }
+    rows.sort((a, b) => b.d - a.d);
+    const gia = giaDien || 0, mx = Math.max(0.001, ...rows.map(r => r.k));
+    const sum = rows.reduce((s, r) => s + r.k, 0);
+    const kwh = v => v.toLocaleString("vi-VN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " kWh";
+    document.getElementById("dSum").textContent = rows.length ? "Tổng " + fmtMoney(sum * gia) + " · " + kwh(sum) + " · " + rows.length + " ngày" : "";
+    const TH = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
+    let html = rows.map(r => {
+      const dt = new Date(Math.floor(r.d / 10000), Math.floor(r.d / 100) % 100 - 1, r.d % 100);
+      const lbl = TH[dt.getDay()] + " " + String(r.d % 100).padStart(2, "0") + "/" + String(Math.floor(r.d / 100) % 100).padStart(2, "0");
+      return '<div class="day-row' + (r.live ? " live" : "") + '"><div class="day-bar" style="width:' + (100 * r.k / mx).toFixed(1) + '%"></div>' +
+             '<span class="day-d' + (dt.getDay() === 0 ? " sun" : "") + '">' + lbl + "</span>" + (r.live ? '<span class="day-t">hôm nay</span>' : "") +
+             '<span class="day-k">' + kwh(r.k) + '</span><span class="day-m">' + fmtMoney(r.k * gia) + "</span></div>";
+    }).join("");
+    if (!rows.length) html = '<div class="day-empty">Chưa có số liệu ngày nào.<br>Mỗi 0:00 ESP32 ghi số điện của ngày vừa hết.</div>';
+    if (html !== dayLastHtml) { dayLastHtml = html; document.getElementById("dList").innerHTML = html; }
+  }
+  dayRender();
+
 </script>
 </body>
 </html>
