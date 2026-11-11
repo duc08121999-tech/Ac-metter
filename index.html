@@ -79,7 +79,7 @@
     .day-box { background: var(--card-bg); padding: 12px; border-radius: 12px; border: 1px solid var(--line); }
     .day-box select { width: 100%; background: #0a0f1d; border: 1px solid var(--line); padding: 9px; color: #fff; font-size: 15px; border-radius: 6px; outline: none; color-scheme: dark; }
     .day-sum { margin: 10px 2px 4px; color: var(--neon-yellow, #ffd400); font-weight: 600; font-size: 14px; }
-    .day-list { max-height: 420px; overflow-y: auto; }
+    .day-list { }
     .day-row { position: relative; display: flex; align-items: center; gap: 8px; padding: 8px 10px; margin-top: 6px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
     .day-row.live { border-color: var(--neon-green); }
     .day-bar { position: absolute; left: 0; top: 0; bottom: 0; background: rgba(0, 229, 255, .13); }
@@ -181,6 +181,16 @@
   </section>
 
   <!-- ================= MỤC 2: BIỂU ĐỒ ================= -->
+  <!-- ================= MỤC 2: TIỀN ĐIỆN TỪNG NGÀY (theo kỳ chốt sổ) ================= -->
+  <section class="tab" id="tab-days">
+    <div class="sec-title">Tiền điện từng ngày</div>
+    <div class="day-box">
+      <select id="dSel"></select>
+      <div class="day-sum" id="dSum"></div>
+      <div class="day-list" id="dList"><div class="day-empty">Đang chờ số liệu từ ESP32...</div></div>
+    </div>
+  </section>
+
   <section class="tab" id="tab-chart">
     <div class="sec-title">Công suất và điện áp</div>
     <div class="chart-box big">
@@ -207,12 +217,6 @@
       </div>
       <div class="input-group"><button id="mMergeBtn" onclick="monthMerge()" style="background:var(--neon-cyan)">Gộp vào tháng sau</button></div>
       <div class="input-group"><button onclick="monthSave(true)" style="background:var(--neon-red)">Xoá cột này</button></div>
-    </div>
-    <div class="sec-title">Tiền điện từng ngày</div>
-    <div class="day-box">
-      <select id="dSel"></select>
-      <div class="day-sum" id="dSum"></div>
-      <div class="day-list" id="dList"><div class="day-empty">Đang chờ số liệu từ ESP32...</div></div>
     </div>
   </section>
 
@@ -307,6 +311,9 @@
 <nav class="tabbar" id="tabbar">
   <button data-tab="main">
     <svg viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg><span>Thông số</span>
+  </button>
+  <button data-tab="days">
+    <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4M7 13h3M7 17h3M14 13h3M14 17h3"/></svg><span>Tiền ngày</span>
   </button>
   <button data-tab="chart">
     <svg viewBox="0 0 24 24"><path d="M3 20h18M5 16l4-5 4 3 6-8"/></svg><span>Biểu đồ</span>
