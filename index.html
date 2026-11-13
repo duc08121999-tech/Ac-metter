@@ -134,6 +134,65 @@
     .tabbar svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
     .tabbar button[data-tab="main"] svg { fill: currentColor; stroke: none; }
     .tabbar button.on { color: var(--neon-cyan); }
+    /* ===== Tốc độ mạng ===== */
+    .sp-box { background: var(--card-bg); padding: 12px; border-radius: 12px; border: 1px solid var(--line); }
+    .sp-top { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 10px; align-items: center; }
+    .gauge { width: 100%; max-width: 260px; display: block; margin: 0 auto; }
+    .gauge .g-bg { stroke: #222c46; }
+    .gauge text { font-family: inherit; }
+    .gauge .g-lbl { fill: #6a7896; font-size: 11px; text-anchor: middle; dominant-baseline: middle; }
+    .gauge .g-num { fill: #fff; font-size: 34px; font-weight: 700; text-anchor: middle; font-variant-numeric: tabular-nums; }
+    .gauge .g-unit { fill: #8a96b3; font-size: 12px; text-anchor: middle; }
+    .gauge .g-ph { font-size: 13px; font-weight: 700; text-anchor: middle; }
+    .gauge .g-fill { transition: stroke-dasharray .25s ease-out; }
+    .sp-stats { display: flex; flex-direction: column; gap: 8px; }
+    .sp-stat { border: 1px solid var(--line); border-radius: 10px; padding: 7px 10px; transition: border-color .2s; }
+    .sp-stat.on { border-color: currentColor; }
+    .sp-stat .l { font-size: 11px; color: var(--text-muted); font-weight: 700; display: flex; align-items: center; gap: 5px; }
+    .sp-stat .v { font-size: 20px; font-weight: 700; color: #fff; font-variant-numeric: tabular-nums; margin-top: 2px; }
+    .sp-stat .v small { font-size: 11px; color: var(--text-muted); font-weight: 600; margin-left: 3px; }
+    .sp-stat.p { color: #ffd60a; } .sp-stat.d { color: #00d2ff; } .sp-stat.u { color: #b46eff; }
+    .sp-info { font-size: 12px; color: var(--text-muted); margin-top: 10px; line-height: 1.5; text-align: center; }
+    .sp-info.err { color: var(--neon-orange); }
+    .sp-btn { width: 100%; margin-top: 10px; padding: 11px; font-size: 15px; border-radius: 22px; color: #001a1a;
+              background: linear-gradient(180deg, #2ee6cf, #00a0b4); }
+    .sp-btn:active { filter: brightness(.85); background: linear-gradient(180deg, #2ee6cf, #00a0b4); }
+    .sp-btn.stop { background: transparent; color: #fff; border: 1.5px solid var(--neon-red); }
+    .sp-btn:disabled { opacity: .45; }
+    /* ===== Danh sách lỗi ===== */
+    .err-box { background: var(--card-bg); padding: 12px; border-radius: 12px; border: 1px solid var(--line); }
+    .err-head { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--text-muted); }
+    .err-head b { color: #fff; }
+    .err-row { position: relative; padding: 8px 10px 8px 14px; margin-top: 6px; border: 1px solid var(--line); border-radius: 8px; }
+    .err-row::before { content: ''; position: absolute; left: 5px; top: 8px; bottom: 8px; width: 3px; border-radius: 2px; background: var(--c, var(--neon-yellow)); }
+    .err-t { font-weight: 600; font-size: 14px; line-height: 1.35; }
+    .err-s { font-size: 12px; color: var(--text-muted); margin-top: 2px; display: flex; justify-content: space-between; }
+    .err-empty { color: var(--neon-green); text-align: center; padding: 22px 0 10px; font-weight: 700; }
+    .err-empty small { display: block; color: var(--text-muted); font-weight: 400; margin-top: 6px; }
+    .err-clr { width: 100%; margin-top: 12px; background: transparent; color: #fff; border: 1.5px solid var(--neon-red); border-radius: 8px; }
+    .err-clr:active { background: rgba(255, 51, 102, .15); }
+    .tabbar button { position: relative; }
+    .tab-badge { position: absolute; top: 0; left: 50%; margin-left: 6px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 9px;
+                 background: #ff3b30; color: #fff; font-size: 10px; font-weight: 700; line-height: 17px; text-align: center; }
+    @media (max-width: 480px) {
+      .tabbar { padding-left: 2px; padding-right: 2px; }
+      .tabbar button { font-size: 10px; gap: 2px; }
+      .tabbar svg { width: 22px; height: 22px; }
+    }
+    @media (max-width: 360px) { .sp-top { grid-template-columns: 1fr; } }
+    /* ===== Lưu lượng data ===== */
+    .nu-live { display: flex; gap: 10px; align-items: stretch; }
+    .nu-live .c { flex: 1; border: 1px solid var(--line); border-radius: 10px; padding: 7px 10px; }
+    .nu-live .l { font-size: 11px; font-weight: 700; display: flex; align-items: center; gap: 5px; }
+    .nu-live .v { font-size: 20px; font-weight: 700; color: #fff; font-variant-numeric: tabular-nums; margin-top: 2px; }
+    .nu-live .v small { font-size: 11px; color: var(--text-muted); font-weight: 600; margin-left: 3px; }
+    .nu-spark { width: 100%; height: 44px; display: block; margin-top: 8px; }
+    .nu-tbl { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; font-variant-numeric: tabular-nums; }
+    .nu-tbl th { font-size: 11px; color: var(--text-muted); font-weight: 600; text-align: right; padding: 4px 2px; }
+    .nu-tbl th:first-child, .nu-tbl td:first-child { text-align: left; }
+    .nu-tbl td { padding: 7px 2px; border-top: 1px solid var(--line); text-align: right; }
+    .nu-tbl td.r { color: #00d2ff; } .nu-tbl td.t { color: #b46eff; } .nu-tbl td.s { color: #fff; font-weight: 700; }
+    .esp-rate { color: #9fb0cc; white-space: nowrap; }
   </style>
 </head>
 <body>
@@ -239,6 +298,76 @@
     <div class="calc-note">Tiền điện tự lấy từ công tơ theo kỳ chốt sổ. Các số bạn nhập được lưu trên máy này.</div>
   </section>
 
+  <!-- ================= MỤC: TỐC ĐỘ MẠNG ================= -->
+  <section class="tab" id="tab-speed">
+    <div class="sec-title">Mạng của ESP32 (đo ngay trên thiết bị)</div>
+    <div class="sp-box">
+      <div class="sp-top">
+        <svg class="gauge" id="gEsp" viewBox="0 0 200 178">
+          <defs><linearGradient id="gEsp-gr" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#0078ff"/><stop offset="1" stop-color="#00d2ff"/></linearGradient></defs>
+          <path class="g-bg" d="M43.4 156.6 A80 80 0 1 1 156.6 156.6" fill="none" stroke-width="13" stroke-linecap="round"/>
+          <path class="g-fill" d="M43.4 156.6 A80 80 0 1 1 156.6 156.6" fill="none" stroke="url(#gEsp-gr)" stroke-width="13" stroke-linecap="round" pathLength="100" stroke-dasharray="0 100"/>
+          <g class="g-lbls"></g>
+          <text class="g-num" x="100" y="106">--</text>
+          <text class="g-unit" x="100" y="126">Mbps</text>
+          <text class="g-ph" x="100" y="172" fill="#707e94">Sẵn sàng</text>
+        </svg>
+        <div class="sp-stats">
+          <div class="sp-stat p" id="sep"><div class="l"><svg width="12" height="12" viewBox="0 0 12 12"><circle cx="6" cy="6" r="4" fill="none" stroke="currentColor" stroke-width="2.4"/></svg>Ping</div><div class="v">--</div></div>
+          <div class="sp-stat d" id="sed"><div class="l"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M6 1v9M2 6.5 6 10.5 10 6.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Tải xuống</div><div class="v">--</div></div>
+          <div class="sp-stat u" id="seu"><div class="l"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M6 11V2M2 5.5 6 1.5 10 5.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Tải lên</div><div class="v">--</div></div>
+        </div>
+      </div>
+      <div class="sp-info" id="seInfo">Chưa có kết quả. Bấm nút dưới để ESP32 tự đo.</div>
+      <button class="sp-btn" id="seBtn" onclick="espSpeedBtn()">Đo tốc độ ESP32</button>
+    </div>
+    <div class="sec-title">Lưu lượng data của ESP32</div>
+    <div class="sp-box">
+      <div class="nu-live">
+        <div class="c" style="color:#00d2ff"><div class="l"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M6 1v9M2 6.5 6 10.5 10 6.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Nhận</div><div class="v" id="nuRx">--</div></div>
+        <div class="c" style="color:#b46eff"><div class="l"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M6 11V2M2 5.5 6 1.5 10 5.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Gửi</div><div class="v" id="nuTx">--</div></div>
+      </div>
+      <svg class="nu-spark" id="nuSpark" viewBox="0 0 300 44" preserveAspectRatio="none"></svg>
+      <table class="nu-tbl">
+        <thead><tr><th>Dung lượng</th><th>Nhận</th><th>Gửi</th><th>Tổng</th></tr></thead>
+        <tbody id="nuBody"><tr><td colspan="4" style="color:var(--text-muted)">Đang chờ ESP32 gửi số liệu...</td></tr></tbody>
+      </table>
+      <div class="sp-info" id="nuInfo">Đếm mọi gói tin qua WiFi của ESP32 (kể cả phần mã hoá). Cập nhật mỗi 10 giây.</div>
+    </div>
+    <div class="sec-title">Mạng của máy này (điện thoại / máy tính)</div>
+    <div class="sp-box">
+      <div class="sp-top">
+        <svg class="gauge" id="gWeb" viewBox="0 0 200 178">
+          <defs><linearGradient id="gWeb-gr" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#0078ff"/><stop offset="1" stop-color="#00d2ff"/></linearGradient></defs>
+          <path class="g-bg" d="M43.4 156.6 A80 80 0 1 1 156.6 156.6" fill="none" stroke-width="13" stroke-linecap="round"/>
+          <path class="g-fill" d="M43.4 156.6 A80 80 0 1 1 156.6 156.6" fill="none" stroke="url(#gWeb-gr)" stroke-width="13" stroke-linecap="round" pathLength="100" stroke-dasharray="0 100"/>
+          <g class="g-lbls"></g>
+          <text class="g-num" x="100" y="106">--</text>
+          <text class="g-unit" x="100" y="126">Mbps</text>
+          <text class="g-ph" x="100" y="172" fill="#707e94">Sẵn sàng</text>
+        </svg>
+        <div class="sp-stats">
+          <div class="sp-stat p" id="swp"><div class="l"><svg width="12" height="12" viewBox="0 0 12 12"><circle cx="6" cy="6" r="4" fill="none" stroke="currentColor" stroke-width="2.4"/></svg>Ping</div><div class="v">--</div></div>
+          <div class="sp-stat d" id="swd"><div class="l"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M6 1v9M2 6.5 6 10.5 10 6.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Tải xuống</div><div class="v">--</div></div>
+          <div class="sp-stat u" id="swu"><div class="l"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M6 11V2M2 5.5 6 1.5 10 5.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Tải lên</div><div class="v">--</div></div>
+        </div>
+      </div>
+      <div class="sp-info" id="swInfo">Máy chủ Cloudflare. Mỗi lần đo tốn khoảng 20 - 150 MB dữ liệu (dùng 4G thì lưu ý).</div>
+      <button class="sp-btn" id="swBtn" onclick="webSpeedBtn()">Bắt đầu đo</button>
+    </div>
+  </section>
+
+  <!-- ================= MỤC: LỖI ================= -->
+  <section class="tab" id="tab-err">
+    <div class="sec-title">Danh sách lỗi của ESP32</div>
+    <div class="err-box">
+      <div class="err-head"><span id="errCnt">Đang chờ ESP32...</span><span id="errAge"></span></div>
+      <div id="errList"></div>
+      <button class="err-clr" id="errClr" onclick="errClear()" style="display:none">Xoá lỗi</button>
+    </div>
+    <div class="calc-note">Mất WiFi, mất MQTT, lỗi đọc PZEM, khởi động lại bất thường... ESP32 ghi lại kèm thời gian. Giống danh sách lỗi trên màn hình LCD.</div>
+  </section>
+
   <!-- ================= MỤC 4: CÀI ĐẶT ================= -->
   <section class="tab" id="tab-setup">
     <div class="sec-title">Tính tiền điện</div>
@@ -320,6 +449,12 @@
   </button>
   <button data-tab="calc">
     <svg viewBox="0 0 24 24"><path d="M6 2h12v20l-3-2-3 2-3-2-3 2z"/><path d="M9 7h6M9 11h6M9 15h4"/></svg><span>Tính tiền</span>
+  </button>
+  <button data-tab="speed">
+    <svg viewBox="0 0 24 24"><path d="M4.5 18a9 9 0 1 1 15 0"/><path d="M12 14l4.5-5"/><circle cx="12" cy="14" r="1.6"/></svg><span>Tốc độ</span>
+  </button>
+  <button data-tab="err">
+    <svg viewBox="0 0 24 24"><path d="M12 3 2.5 20h19z"/><path d="M12 10v4.5M12 17.2v.1"/></svg><span>Lỗi</span><b class="tab-badge" id="errBadge" style="display:none"></b>
   </button>
   <button data-tab="setup">
     <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg><span>Cài đặt</span>
@@ -491,6 +626,9 @@
   function onMessageArrived(message) {
     const topic = message.destinationName.replace(TOPIC_PREFIX + "/", "");
     if (topic.indexOf("days/") === 0) { dayIngest(topic.slice(5), message.payloadString); return; }   // tiền từng ngày của 1 kỳ
+    if (topic === "errors") { try { errIngest(message.payloadString, true); } catch (e) {} return; }   // danh sách lỗi
+    if (topic === "net") { try { netIngest(message.payloadString); } catch (e) {} return; }   // lưu lượng data
+    if (topic === "speed" || topic === "speed_live") { try { espSpeedIngest(topic, message.payloadString); } catch (e) {} return; }
     if (topic === "data" || topic === "info") {
       let obj = null;
       try { obj = JSON.parse(message.payloadString); } catch (err) { return; }
@@ -1207,6 +1345,7 @@
     if (espRssi !== null && !isNaN(espRssi)) {
       parts.push("WiFi " + espRssi + " dBm (" + (espRssi > -60 ? "tốt" : espRssi > -75 ? "trung bình" : "yếu") + ")");
     }
+    if (typeof netRateText === "function") { const nr = netRateText(); if (nr) parts.push('<span class="esp-rate">' + nr + "</span>"); }   // tốc độ đang dùng, cạnh sóng WiFi
     if (espUptime !== null && !isNaN(espUptime)) parts.push("chạy " + fmtDur(espUptime));
     if (espRecon !== null && !isNaN(espRecon)) parts.push("nối lại MQTT " + Math.max(0, espRecon - 1) + " lần");
     if (espHeap !== null && !isNaN(espHeap)) parts.push("RAM trống " + Math.round(espHeap / 1024) + " KB");
@@ -1351,6 +1490,301 @@
     if (html !== dayLastHtml) { dayLastHtml = html; document.getElementById("dList").innerHTML = html; }
   }
   dayRender();
+  // ================= ĐỒNG HỒ TỐC ĐỘ (dùng chung cho ESP32 và máy này) =================
+  const SP_SCALES = { gEsp: [0, 1, 5, 10, 20, 50, 100], gWeb: [0, 10, 50, 100, 250, 500, 1000] };   // Mbps, mỗi khoảng chia đều
+  const SP_COL = { ping: "#ffd60a", dl: "#00d2ff", ul: "#b46eff" };
+  function spFrac(v, S) {
+    if (!(v > 0)) return 0;
+    if (v >= S[6]) return 1;
+    for (let i = 0; i < 6; i++) if (v <= S[i + 1]) return (i + (v - S[i]) / (S[i + 1] - S[i])) / 6;
+    return 1;
+  }
+  const spNum = v => (v === null || v === undefined || !(v >= 0)) ? "--" : (v >= 100 ? Math.round(v).toLocaleString("vi-VN") : v.toLocaleString("vi-VN", { minimumFractionDigits: 1, maximumFractionDigits: 1 }));
+  function gaugeInit(id) {
+    const g = document.getElementById(id), lb = g.querySelector(".g-lbls");
+    SP_SCALES[id].forEach((v, i) => {
+      const a = (135 + 270 * i / 6) * Math.PI / 180;
+      const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      t.setAttribute("x", (100 + 57 * Math.cos(a)).toFixed(1)); t.setAttribute("y", (100 + 57 * Math.sin(a)).toFixed(1));
+      t.setAttribute("class", "g-lbl"); t.textContent = v; lb.appendChild(t);
+    });
+  }
+  // phase: "ping" | "dl" | "ul" | "done" | "err" | ""
+  function gaugeSet(id, phase, val, phText) {
+    const g = document.getElementById(id);
+    const isPing = phase === "ping";
+    const f = isPing ? 0 : spFrac(val, SP_SCALES[id]);
+    const fl = g.querySelector(".g-fill");
+    fl.setAttribute("stroke-dasharray", (f * 100).toFixed(2) + " 100");
+    fl.style.opacity = f > 0 ? 1 : 0;                                  // 0: ẩn hẳn (không còn chấm tròn ở 2 đầu)
+    const stops = g.querySelectorAll("stop");
+    const up = phase === "ul";
+    stops[0].setAttribute("stop-color", up ? "#6e3ce6" : "#0078ff");
+    stops[1].setAttribute("stop-color", up ? "#b46eff" : "#00d2ff");
+    const n = g.querySelector(".g-num");
+    n.textContent = spNum(val);
+    n.style.fill = isPing ? SP_COL.ping : (val >= 0 ? "#fff" : "#707e94");
+    g.querySelector(".g-unit").textContent = isPing ? "ms" : "Mbps";
+    const ph = g.querySelector(".g-ph");
+    ph.textContent = phText;
+    ph.setAttribute("fill", phase === "err" ? "#ff9900" : (SP_COL[phase] || (phase === "done" ? SP_COL.dl : "#707e94")));
+  }
+  function statSet(px, phase, ping, dl, ul) {
+    const set = (k, v, unit, on) => {
+      const el = document.getElementById(px + k);
+      el.classList.toggle("on", on);
+      el.querySelector(".v").innerHTML = (v >= 0 ? spNum(v) + "<small>" + unit + "</small>" : "--");
+    };
+    set("p", ping, "ms", phase === "ping"); set("d", dl, "Mbps", phase === "dl"); set("u", ul, "Mbps", phase === "ul");
+  }
+  const SP_PH = { ping: "Đang đo ping...", dl: "Đang đo tải xuống", ul: "Đang đo tải lên", done: "Tải xuống", err: "Chưa đo xong" };
+  const tFmt = t => { const d = new Date(t); return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0") + " " + String(d.getDate()).padStart(2, "0") + "/" + String(d.getMonth() + 1).padStart(2, "0"); };
+  gaugeInit("gEsp"); gaugeInit("gWeb");
+
+  // ================= TỐC ĐỘ MẠNG CỦA ESP32 (ESP32 tự đo, gửi qua MQTT) =================
+  // <prefix>/speed (giữ trên broker): kết quả lần cuối. <prefix>/speed_live: đang đo (mỗi giây) / lỗi
+  let espSp = { st: "", ph: "", live: 0, ping: -1, dl: -1, ul: -1, t: 0, ssid: "", rssi: 0, msg: "", at: 0 };
+  let espSpDone = null;
+  try { espSpDone = JSON.parse(localStorage.getItem("pzem_speed_" + TOPIC_PREFIX) || "null"); } catch (e) {}
+  function espSpeedIngest(topic, payload) {
+    let o = null;
+    try { o = JSON.parse(payload); } catch (e) { return; }
+    if (!o || typeof o !== "object") return;
+    if (o.st === "done") { espSpDone = o; try { localStorage.setItem("pzem_speed_" + TOPIC_PREFIX, JSON.stringify(o)); } catch (e) {} }
+    if (topic === "speed_live" || o.st === "done") espSp = Object.assign({}, o, { at: Date.now() });
+    espSpeedRender();
+  }
+  function espSpRunning() { return espSp.st === "run" && Date.now() - espSp.at < 12000; }   // 12 giây không có tin: coi như đã dừng
+  function espSpeedRender() {
+    const btn = document.getElementById("seBtn"), info = document.getElementById("seInfo");
+    info.classList.remove("err");
+    if (espSpRunning()) {
+      const ph = espSp.ph;
+      gaugeSet("gEsp", ph, ph === "ping" ? (espSp.ping >= 0 ? espSp.ping : -1) : espSp.live, SP_PH[ph] || "");
+      statSet("se", ph, espSp.ping, ph === "dl" ? espSp.live : espSp.dl, ph === "ul" ? espSp.live : espSp.ul);
+      info.textContent = "ESP32 đang đo qua WiFi " + (espSp.ssid || "") + (espSp.rssi ? " (" + espSp.rssi + " dBm)" : "") + " · máy chủ Cloudflare";
+      btn.textContent = "Dừng"; btn.classList.add("stop");
+      return;
+    }
+    btn.textContent = espSpDone ? "Đo lại tốc độ ESP32" : "Đo tốc độ ESP32"; btn.classList.remove("stop");
+    const d = espSpDone;
+    if (d) {
+      gaugeSet("gEsp", "done", d.dl, SP_PH.done);
+      statSet("se", "", d.ping, d.dl, d.ul);
+      info.textContent = (d.t > 1700000000 ? "Đo lúc " + tFmt(d.t * 1000) + " · " : "") + "WiFi " + (d.ssid || "?") + " " + (d.rssi || "") + " dBm";
+    } else { gaugeSet("gEsp", "", -1, "Sẵn sàng"); statSet("se", "", -1, -1, -1); }
+    if (espSp.st === "err" && Date.now() - espSp.at < 60000) { info.textContent = "ESP32 báo: " + espSp.msg; info.classList.add("err"); gaugeSet("gEsp", "err", d ? d.dl : -1, SP_PH.err); }
+  }
+  function espSpeedBtn() {
+    const run = espSpRunning();
+    if (!sendCmd("set_speedtest", run ? 0 : 1)) return;
+    if (!run) { espSp = { st: "run", ph: "ping", live: 0, ping: -1, dl: -1, ul: -1, ssid: "", rssi: 0, at: Date.now() }; }
+    else espSp.st = "";
+    espSpeedRender();
+    if (!run) { const i = document.getElementById("seInfo"); i.textContent = "Đã gửi lệnh, đang chờ ESP32 bắt đầu đo..."; }
+  }
+  setInterval(() => { if (espSp.st === "run" && !espSpRunning()) { espSp.st = ""; espSpeedRender(); } }, 3000);
+  espSpeedRender();
+
+  // ================= TỐC ĐỘ MẠNG CỦA MÁY NÀY (trình duyệt đo trực tiếp với máy chủ Cloudflare) =================
+  const CF = "https://speed.cloudflare.com";
+  const WS_KEY = "pzem_webspeed";
+  let ws = { run: false, stop: false, ph: "", live: -1, ping: -1, dl: -1, ul: -1 };
+  let wsLast = null;
+  try { wsLast = JSON.parse(localStorage.getItem(WS_KEY) || "null"); } catch (e) {}
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const cfUrl = (p) => CF + p + (p.indexOf("?") < 0 ? "?" : "&") + "r=" + Math.random().toString(36).slice(2);
+  function webSpeedRender() {
+    const btn = document.getElementById("swBtn"), info = document.getElementById("swInfo");
+    info.classList.remove("err");
+    if (ws.run) {
+      gaugeSet("gWeb", ws.ph, ws.ph === "ping" ? ws.live : ws.live, SP_PH[ws.ph] || "");
+      statSet("sw", ws.ph, ws.ping, ws.ph === "dl" ? ws.live : ws.dl, ws.ph === "ul" ? ws.live : ws.ul);
+      btn.textContent = "Dừng"; btn.classList.add("stop");
+      info.textContent = "Đang đo với máy chủ Cloudflare...";
+      return;
+    }
+    btn.textContent = wsLast ? "Đo lại" : "Bắt đầu đo"; btn.classList.remove("stop");
+    if (wsLast) {
+      gaugeSet("gWeb", "done", wsLast.dl, SP_PH.done);
+      statSet("sw", "", wsLast.ping, wsLast.dl, wsLast.ul);
+      info.textContent = "Đo lúc " + tFmt(wsLast.t) + (wsLast.net ? " · " + wsLast.net : "") + " · máy chủ Cloudflare";
+    } else { gaugeSet("gWeb", "", -1, "Sẵn sàng"); statSet("sw", "", -1, -1, -1); }
+    if (ws.err) { info.textContent = ws.err; info.classList.add("err"); }
+  }
+  async function webPing() {
+    const v = [];
+    for (let i = 0; i < 9 && !ws.stop; i++) {
+      const u = cfUrl("/__down?bytes=0");
+      const t0 = performance.now();
+      const r = await fetch(u, { cache: "no-store" });
+      await r.arrayBuffer();
+      let ms = performance.now() - t0;
+      const e = performance.getEntriesByName(u).pop();                 // thời gian chờ máy chủ trả lời (chính xác hơn nếu có)
+      if (e && e.responseStart > 0 && e.requestStart > 0) ms = e.responseStart - e.requestStart;
+      if (i > 0) { v.push(ms); ws.live = ms; ws.ping = -1; webSpeedRender(); }   // lần đầu còn mở kết nối: bỏ
+    }
+    v.sort((a, b) => a - b);
+    return v.length ? v[Math.floor(v.length / 2)] : -1;
+  }
+  // đo theo thời gian: nhiều luồng song song, bỏ 1 giây đầu, tốc độ tức thời làm mượt
+  async function webTransfer(dl, durMs) {
+    const t0 = performance.now(), ctrls = [];
+    let bytes = 0, warmB = -1, warmT = 0, done = false, winT = t0, winB = 0;
+    const tick = setInterval(() => {
+      const now = performance.now();
+      if (warmB < 0 && now - t0 >= 1000) { warmB = bytes; warmT = now; }
+      const inst = (bytes - winB) * 8 / ((now - winT) * 1000);
+      ws.live = ws.live > 0 ? ws.live * 0.55 + inst * 0.45 : inst;
+      winT = now; winB = bytes;
+      webSpeedRender();
+    }, 250);
+    const upBuf = dl ? null : new Uint8Array(1 << 21).map((_, i) => (i * 37) & 255);
+    let upSize = 1 << 17;                                              // tải lên: gói lớn dần 128 KB -> 2 MB
+    const worker = async () => {
+      while (!done && !ws.stop) {
+        const c = new AbortController(); ctrls.push(c);
+        try {
+          if (dl) {
+            const r = await fetch(cfUrl("/__down?bytes=25000000"), { cache: "no-store", signal: c.signal });
+            const rd = r.body.getReader();
+            while (true) { const x = await rd.read(); if (x.done) break; bytes += x.value.length; if (done || ws.stop) { c.abort(); break; } }
+          } else {
+            const n = upSize;
+            const tS = performance.now();
+            await fetch(cfUrl("/__up"), { method: "POST", body: upBuf.subarray(0, n), signal: c.signal });
+            bytes += n;
+            if (performance.now() - tS < 1500 && upSize < upBuf.length) upSize *= 2;
+          }
+        } catch (e) { if (!done && !ws.stop) await sleep(300); }
+      }
+    };
+    const workers = [];
+    for (let i = 0; i < (dl ? 4 : 3); i++) workers.push(worker());
+    while (!ws.stop && performance.now() - t0 < durMs) await sleep(100);
+    const tEnd = performance.now(), bEnd = bytes;
+    done = true; ctrls.forEach(c => { try { c.abort(); } catch (e) {} });
+    clearInterval(tick);
+    await Promise.race([Promise.all(workers), sleep(1500)]);
+    if (warmB >= 0 && tEnd > warmT) return (bEnd - warmB) * 8 / ((tEnd - warmT) * 1000);
+    return bEnd * 8 / ((tEnd - t0) * 1000);
+  }
+  async function webSpeedBtn() {
+    if (ws.run) { ws.stop = true; return; }
+    ws = { run: true, stop: false, ph: "ping", live: -1, ping: -1, dl: -1, ul: -1, err: "" };
+    webSpeedRender();
+    try {
+      ws.ping = await webPing(); if (ws.stop) throw new Error("stop");
+      ws.ph = "dl"; ws.live = 0; webSpeedRender();
+      ws.dl = await webTransfer(true, 10000); if (ws.stop) throw new Error("stop");
+      ws.ph = "ul"; ws.live = 0; webSpeedRender();
+      ws.ul = await webTransfer(false, 8000); if (ws.stop) throw new Error("stop");
+      const c = navigator.connection || {};
+      wsLast = { t: Date.now(), ping: ws.ping, dl: ws.dl, ul: ws.ul, net: c.type === "wifi" ? "WiFi" : (c.type === "cellular" ? "4G/5G" : "") };
+      try { localStorage.setItem(WS_KEY, JSON.stringify(wsLast)); } catch (e) {}
+    } catch (e) {
+      ws.err = e && e.message === "stop" ? "Đã dừng đo." : "Không đo được (mất mạng hoặc máy chủ đo bị chặn).";
+    }
+    ws.run = false; ws.ph = "";
+    webSpeedRender();
+  }
+  webSpeedRender();
+
+  // ================= DANH SÁCH LỖI CỦA ESP32 =================
+  // <prefix>/errors (giữ trên broker): {"n":2,"e":[[giờ, mã, số lần, "nội dung"], ...]} (mới nhất ở đầu)
+  const EKEY = "pzem_errors_" + TOPIC_PREFIX;
+  let errData = null, errAt = 0;
+  try { const o = JSON.parse(localStorage.getItem(EKEY) || "null"); if (o) { errData = o.d; errAt = o.at || 0; } } catch (e) {}
+  const ERR_COL = { 5: "#ff3366", 1: "#ff9900", 7: "#ff9900", 8: "#00f0ff", 9: "#00f0ff" };
+  function errIngest(payload, live) {
+    let o = null;
+    try { o = JSON.parse(payload); } catch (e) { return; }
+    if (!o || !Array.isArray(o.e)) return;
+    errData = o; errAt = Date.now();
+    try { localStorage.setItem(EKEY, JSON.stringify({ d: o, at: errAt })); } catch (e) {}
+    errRender();
+  }
+  const escHtml = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  function errRender() {
+    const list = document.getElementById("errList"), cnt = document.getElementById("errCnt"), badge = document.getElementById("errBadge");
+    const clr = document.getElementById("errClr");
+    if (!errData) { cnt.textContent = "Đang chờ ESP32 gửi danh sách lỗi..."; list.innerHTML = ""; clr.style.display = "none"; badge.style.display = "none"; return; }
+    const n = errData.n || 0;
+    cnt.innerHTML = n ? "<b>" + n + "</b> lỗi (mới nhất ở trên)" : "Không có lỗi";
+    badge.textContent = n > 99 ? "99+" : n;
+    badge.style.display = n ? "" : "none";
+    clr.style.display = n ? "" : "none";
+    if (!n) { list.innerHTML = '<div class="err-empty">✓ Không có lỗi nào<small>Có lỗi mới ESP32 sẽ tự gửi lên đây.</small></div>'; return; }
+    list.innerHTML = errData.e.map((r, i) => {
+      const t = Number(r[0]) || 0, code = r[1], c = Number(r[2]) || 1;
+      const when = t > 1700000000 ? tFmt(t * 1000) : (t < 60 ? "lúc bật +" + t + " giây" : "lúc bật +" + Math.floor(t / 60) + " phút");
+      return '<div class="err-row" style="--c:' + (ERR_COL[code] || "#ffd400") + '"><div class="err-t">' + escHtml(r[3]) + "</div>" +
+             '<div class="err-s"><span>' + when + (c > 1 ? " · " + c + " lần (giờ lần cuối)" : "") + "</span><span>#" + (i + 1) + "</span></div></div>";
+    }).join("") + (errData.e.length < n ? '<div class="err-empty" style="color:var(--text-muted);font-weight:400">... còn ' + (n - errData.e.length) + " lỗi cũ hơn xem trên LCD</div>" : "");
+  }
+  function errClear() {
+    if (!errData || !errData.n) return;
+    if (!confirm("Xoá toàn bộ " + errData.n + " lỗi trên ESP32?")) return;
+    if (sendCmd("set_err_clear", 1)) { document.getElementById("errCnt").textContent = "Đã gửi lệnh xoá, đang chờ ESP32..."; }
+  }
+  errRender();
+
+  // ================= LƯU LƯỢNG DATA CỦA ESP32 =================
+  // <prefix>/net (mỗi 10 giây): {"rx":B/s,"tx":B/s,"d":[nhận,gửi],"y":..,"m":..,"pm":..,"b":..,"up":giây}
+  let netD = null, netAt = 0;
+  const netHist = [];
+  try { const o = JSON.parse(localStorage.getItem("pzem_net_" + TOPIC_PREFIX) || "null"); if (o) { netD = o.d; netAt = o.at; } } catch (e) {}
+  function fmtB(v) {
+    v = Number(v) || 0;
+    const U = ["B", "KB", "MB", "GB"]; let u = 0;
+    while (v >= 1024 && u < 3) { v /= 1024; u++; }
+    if (!u) return Math.round(v) + " B";
+    const d = v < 10 ? 2 : (v < 100 ? 1 : 0);
+    return v.toLocaleString("vi-VN", { maximumFractionDigits: d, minimumFractionDigits: d }) + " " + U[u];
+  }
+  function fmtR(bps) {
+    const k = (Number(bps) || 0) / 1024;
+    if (k >= 1000) return (k / 1024).toLocaleString("vi-VN", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + "<small>MB/s</small>";
+    const d = k < 10 ? 1 : 0;
+    return k.toLocaleString("vi-VN", { minimumFractionDigits: d, maximumFractionDigits: d }) + "<small>KB/s</small>";
+  }
+  function netRateText() {                                           // "↓1,2 ↑0,4 KB/s" cho dòng trạng thái ESP32
+    if (!netD || Date.now() - netAt > 30000) return "";
+    const f = v => { const k = (Number(v) || 0) / 1024, d = k < 10 ? 1 : 0; return k.toLocaleString("vi-VN", { minimumFractionDigits: d, maximumFractionDigits: d }); };
+    return "↓" + f(netD.rx) + " ↑" + f(netD.tx) + " KB/s";
+  }
+  function netIngest(payload) {
+    let o = null;
+    try { o = JSON.parse(payload); } catch (e) { return; }
+    if (!o || !Array.isArray(o.d)) return;
+    netD = o; netAt = Date.now();
+    netHist.push((Number(o.rx) || 0) + (Number(o.tx) || 0)); if (netHist.length > 60) netHist.shift();
+    try { localStorage.setItem("pzem_net_" + TOPIC_PREFIX, JSON.stringify({ d: o, at: netAt })); } catch (e) {}
+    netRender(); try { updateEsp(); } catch (e) {}
+  }
+  function netRender() {
+    if (!netD) return;
+    const fresh = Date.now() - netAt < 30000;
+    document.getElementById("nuRx").innerHTML = fresh ? fmtR(netD.rx) : "--";
+    document.getElementById("nuTx").innerHTML = fresh ? fmtR(netD.tx) : "--";
+    const rows = [["Hôm nay", netD.d], ["Hôm qua", netD.y], ["Tháng này", netD.m], ["Tháng trước", netD.pm], ["Từ lúc bật", netD.b]];
+    document.getElementById("nuBody").innerHTML = rows.map(r => {
+      const a = (r[1] && r[1][0]) || 0, b = (r[1] && r[1][1]) || 0;
+      return "<tr><td>" + r[0] + '</td><td class="r">' + fmtB(a) + '</td><td class="t">' + fmtB(b) + '</td><td class="s">' + fmtB(a + b) + "</td></tr>";
+    }).join("");
+    const sp = document.getElementById("nuSpark");
+    if (netHist.length) {
+      const mx = Math.max(2048, ...netHist), w = 300 / 60;
+      sp.innerHTML = '<line x1="0" y1="43.5" x2="300" y2="43.5" stroke="#2a3550"/>' + netHist.map((v, i) => {
+        const h = Math.max(v ? 1 : 0, v / mx * 42), x = 300 - (netHist.length - i) * w;
+        return '<rect x="' + (x + 0.5).toFixed(1) + '" y="' + (43 - h).toFixed(1) + '" width="' + (w - 1).toFixed(1) + '" height="' + h.toFixed(1) + '" rx="1" fill="#00d2ff" opacity="' + (0.45 + 0.55 * (i + 1) / netHist.length).toFixed(2) + '"/>';
+      }).join("");
+    }
+    document.getElementById("nuInfo").textContent = fresh ? "Cột: tốc độ đang dùng, mỗi cột 10 giây. Đếm mọi gói tin qua WiFi của ESP32 (kể cả phần mã hoá)."
+      : "Số liệu lúc " + tFmt(netAt) + " (ESP32 chưa gửi số mới).";
+  }
+  setInterval(netRender, 15000);
+  netRender();
 
 </script>
 </body>
