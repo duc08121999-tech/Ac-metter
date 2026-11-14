@@ -465,14 +465,14 @@
 <script>
   // ================= CẤU HÌNH MQTT =================
   // Broker riêng EMQX Cloud Serverless: WebSocket bảo mật (wss) cổng 8084, đường dẫn /mqtt
-  const MQTT_BROKER = "y63c1160.ala.us-east-1.emqxsl.com";
+  const MQTT_BROKER = "sca18112.ala.asia-southeast1.emqxsl.com";   // khu vực Singapore
   const USE_SSL     = true;
   const MQTT_PORT   = 8084;                 // WebSocket over TLS/SSL Port
   const MQTT_PATH   = "/mqtt";
   // Tài khoản tạo trong EMQX: Access Control > Authentication (dùng tài khoản "web", KHÁC tài khoản của ESP32)
   // Lưu ý: ai xem được mã trang này đều thấy mật khẩu, đừng chia sẻ địa chỉ trang cho người lạ.
   const MQTT_USER   = "web";
-  const MQTT_PASS   = "9018Nhung@";                  // mật khẩu tài khoản web
+  const MQTT_PASS   = "Duc9018@";                    // mật khẩu tài khoản web
 
   // Tiền tố topic: PHẢI trùng với MQTT_PREFIX trong code ESP32.
   // Broker công cộng ai cũng đọc/ghi được nên dùng chuỗi riêng, không dùng "pzem" chung.
