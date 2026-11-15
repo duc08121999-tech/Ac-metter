@@ -257,6 +257,8 @@
         <button data-w="60000">1 phút</button>
         <button data-w="600000">10 phút</button>
         <button data-w="3600000">1 giờ</button>
+        <button data-w="21600000">6 giờ</button>
+        <button data-w="86400000">24 giờ</button>
       </div>
       <canvas id="realtimeChart"></canvas>
     </div>
@@ -421,6 +423,17 @@
         <div class="set-cur" id="ota_addr" style="margin-top:4px;"></div>
         <div class="set-cur" id="ota_st" style="margin-top:6px;">Bấm nút dưới để bật. Nạp xong ESP32 khởi động lại và tự tắt (không nạp thì 10 phút tự tắt).</div>
         <div class="input-group"><button id="ota_btn" onclick="otaLan()">Bật chế độ nạp code</button></div>
+      </div>
+    </div>
+    <div class="row r1">
+      <div class="card setting">
+        <div class="label" style="color:var(--neon-orange);">📱 Điện thoại trung gian (Android)</div>
+        <div class="set-cur">Đang dùng: <b id="br_st">--</b></div>
+        <div class="set-cur" style="margin-top:6px;">ESP32 gửi tin tới điện thoại Android trong mạng nhà, điện thoại chuyển tiếp lên broker. Điện thoại tắt thì ESP32 tự nối thẳng broker. Để trống rồi bấm Lưu = bỏ dùng.</div>
+        <div class="input-group row-input">
+          <input type="text" id="input_br" inputmode="decimal" placeholder="VD: 192.168.1.50">
+          <button onclick="saveBridge()">Lưu</button>
+        </div>
       </div>
     </div>
     <div class="sec-title">Trạng thái kết nối</div>
@@ -592,6 +605,7 @@
     gotData = false;
     if (!hasCache) setStatus("🟢 ĐÃ KẾT NỐI BROKER - ĐANG CHỜ DỮ LIỆU TỪ ESP32...", true);
     client.subscribe(TOPIC_PREFIX + "/#");
+    setTimeout(mlogRequest, 2000);                                  // lấy phần sổ ghi từng phút còn thiếu (lúc web đóng)
   }
 
   function onFailure(err) {
@@ -618,7 +632,7 @@
   // Nhận dữ liệu từ ESP32 và đẩy lên giao diện
   let gotData = false;
   let warned = false;
-  let espStall = 0, espState = "", espRssi = null, espUptime = null, espRecon = null, espHeap = null, espDrc = 0, espDup = 0, espDout = 0, espRr = null, espRrn = 0, espWl = 0, espWr = 0;
+  let brMode = 0, brIp = "", espStall = 0, espState = "", espRssi = null, espUptime = null, espRecon = null, espHeap = null, espDrc = 0, espDup = 0, espDout = 0, espRr = null, espRrn = 0, espWl = 0, espWr = 0;
   const cache = {};
   let lastMsg = 0, lastPow = 0, lastVol = 0;
   const powTimes = [];   // thời điểm các tin công suất đã nhận   // đo độ trễ và chu kỳ dữ liệu từ ESP32
@@ -627,10 +641,11 @@
   const MAP_INFO = { hn: "kwh_homnay", hq: "kwh_homqua", tn: "kwh_thangnay", tt: "kwh_thangtruoc", tong: "kwh_tong",
                      dtn: "tien_thangnay", dtt: "tien_thangtruoc", ngay: "status_ngaychot", gia: "status_dongia",
                      rssi: "rssi", up: "uptime", rc: "reconnects", heap: "heap", drc: "disc_rc", dup: "disc_up", dout: "disc_out", rr: "reset_reason", rrn: "reset_bad", wl: "wifi_lost", wr: "wifi_reason", fw: "fw_version", ip: "esp_ip", ota: "ota_min",
-                     gc: "gio_chot", ky: "ky_chot", cr: "cs_thangroi", ct: "cs_thangtruoc", stl: "mq_stall" };
+                     gc: "gio_chot", ky: "ky_chot", cr: "cs_thangroi", ct: "cs_thangtruoc", stl: "mq_stall", br: "bridge_mode", bip: "bridge_ip" };
   function onMessageArrived(message) {
     const topic = message.destinationName.replace(TOPIC_PREFIX + "/", "");
     if (topic.indexOf("days/") === 0) { dayIngest(topic.slice(5), message.payloadString); return; }   // tiền từng ngày của 1 kỳ
+    if (topic === "hist") { try { mlogIngest(message.payloadString); } catch (e) {} return; }   // sổ ghi từng phút
     if (topic === "errors") { try { errIngest(message.payloadString, true); } catch (e) {} return; }   // danh sách lỗi
     if (topic === "net") { try { netIngest(message.payloadString); } catch (e) {} return; }   // lưu lượng data
     if (topic === "speed" || topic === "speed_live") { try { espSpeedIngest(topic, message.payloadString); } catch (e) {} return; }
@@ -677,6 +692,8 @@
       case "kwh_tong":        setValue("kwh_tong", payload, "kWh"); break;
       case "status":     if (live) { espState = payload; updateEsp(); } break;
       case "mq_stall":   if (live) { espStall = Number(payload) || 0; updateEsp(); } break;
+      case "bridge_mode": brMode = Number(payload) || 0; showBridge(); break;
+      case "bridge_ip":   brIp = payload; showBridge(); break;
       case "rssi":       if (live) { espRssi = Number(payload); updateEsp(); } break;
       case "uptime":     if (live) { espUptime = Number(payload); updateEsp(); } break;
       case "reconnects": if (live) { espRecon = Number(payload); updateEsp(); } break;
@@ -790,6 +807,43 @@
   }
 
   // ================= ĐỒ THỊ CÔNG SUẤT + ĐIỆN ÁP (tự vẽ, cuộn liên tục, có lưu lịch sử) =================
+  // ===== SỔ GHI TỪNG PHÚT TỪ ESP32 (kiểu datalogger): topic "hist" {"h":[[phút, W tb, W max, V x10], ...]} =====
+  const MLKEY = "pzem_mlog_" + TOPIC_PREFIX;
+  const ML_KEEP = 48 * 60;                                         // giữ 48 giờ trong máy
+  let mlog = {};
+  try { mlog = JSON.parse(localStorage.getItem(MLKEY) || "{}") || {}; } catch (e) { mlog = {}; }
+  let mlogDirty = false;
+  function mlogIngest(payload) {
+    let o = null;
+    try { o = JSON.parse(payload); } catch (e) { return; }
+    if (!o || !Array.isArray(o.h)) return;
+    for (const r of o.h) if (Array.isArray(r) && r.length >= 4) mlog[r[0]] = [r[1], r[2], r[3]];
+    const cut = Math.floor(Date.now() / 60000) - ML_KEEP;
+    for (const k in mlog) if (Number(k) < cut) delete mlog[k];
+    mlogDirty = true;
+  }
+  setInterval(function () { if (mlogDirty) { mlogDirty = false; try { localStorage.setItem(MLKEY, JSON.stringify(mlog)); } catch (e) {} } }, 15000);
+  function mlogPoints(from) {
+    const out = [];
+    for (const k of Object.keys(mlog).map(Number).sort((a, b) => a - b)) {
+      const t = k * 60000 + 30000;
+      if (t < from - 120000) continue;
+      const r = mlog[k];
+      out.push({ t: t, v: r[0], u: r[2] ? r[2] / 10 : null });
+    }
+    return out;
+  }
+  function mlogMerge(h, from) {                                    // điểm 2 giây + phút còn thiếu lấy từ sổ ghi
+    const have = new Set();
+    for (const p of h) if (p.t >= from - 60000) have.add(Math.floor(p.t / 60000));
+    const add = mlogPoints(from).filter(p => !have.has(Math.floor(p.t / 60000)));
+    return h.concat(add).sort((a, b) => a.t - b.t);
+  }
+  function mlogRequest() {                                         // hỏi ESP32 phần sổ ghi còn thiếu
+    const ks = Object.keys(mlog).map(Number);
+    const since = ks.length ? Math.max.apply(null, ks) : 0;
+    try { const m = new Paho.MQTT.Message(String(since)); m.destinationName = TOPIC_PREFIX + "/set_hist_req"; client.send(m); } catch (e) {}
+  }
   let latestPower = null;
   let latestVoltage = null;
   let curTab = "main";                                 // mục đang mở
@@ -802,8 +856,8 @@
     const HIST_KEEP = 3600000;   // giữ lịch sử 1 giờ
     const HKEY = "pzem_hist_" + TOPIC_PREFIX;
     const WKEY = "pzem_win_" + TOPIC_PREFIX;
-    const LABELS = { 60000: "1 phút", 600000: "10 phút", 3600000: "1 giờ" };
-    const MID = { 60000: "30 giây", 600000: "5 phút", 3600000: "30 phút" };
+    const LABELS = { 60000: "1 phút", 600000: "10 phút", 3600000: "1 giờ", 21600000: "6 giờ", 86400000: "24 giờ" };
+    const MID = { 60000: "30 giây", 600000: "5 phút", 3600000: "30 phút", 21600000: "3 giờ", 86400000: "12 giờ" };
     const COL_P = "#00f0ff";     // công suất (trục trái)
     const COL_U = "#ffd400";     // điện áp (trục phải)
 
@@ -896,8 +950,13 @@
 
       const headP = freshP && smoothP !== null;
       const headU = freshU && smoothU !== null;
-      const src = win <= 60000 ? pts : hist;
-      const gap = win <= 60000 ? 3000 : 8000;
+      // 6 giờ / 24 giờ: lấy từ sổ ghi từng phút của ESP32 (có cả lúc web đóng / mất mạng)
+      // 1 giờ: điểm 2 giây của web, phút nào web không có thì lấy từ sổ ghi
+      let src, gap;
+      if (win <= 60000) { src = pts; gap = 3000; }
+      else if (win <= 600000) { src = hist; gap = 8000; }
+      else if (win <= 3600000) { src = mlogMerge(hist, nowMs - win); gap = 150000; }
+      else { src = mlogPoints(nowMs - win); gap = 150000; }
       const tFrom = nowMs - win;
 
       // thang đo: công suất bắt đầu từ 0, điện áp tự co giãn quanh giá trị đang có
@@ -1341,6 +1400,19 @@
     if (sec < 86400) return Math.floor(sec / 3600) + " giờ " + Math.floor((sec % 3600) / 60) + " phút";
     return Math.floor(sec / 86400) + " ngày " + Math.floor((sec % 86400) / 3600) + " giờ";
   }
+  function showBridge() {
+    const el = document.getElementById("br_st"), inp = document.getElementById("input_br");
+    if (!el) return;
+    if (brMode === 1) { el.textContent = "qua điện thoại " + brIp + " ✓"; el.style.color = "#39ff14"; }
+    else if (brMode === 2) { el.textContent = "điện thoại " + brIp + " không trả lời → đang nối thẳng broker"; el.style.color = "#ff9900"; }
+    else { el.textContent = "không (ESP32 nối thẳng broker)"; el.style.color = ""; }
+    if (inp && document.activeElement !== inp && !inp.value) inp.value = brIp || "";
+  }
+  function saveBridge() {
+    const v = document.getElementById("input_br").value.trim();
+    if (v && !/^(\d{1,3}\.){3}\d{1,3}$/.test(v)) { alert("IP không đúng dạng, ví dụ 192.168.1.50"); return; }
+    if (sendCmd("set_bridge", v || "0")) alert(v ? "✔️ Đã gửi: ESP32 sẽ nối qua điện thoại " + v : "✔️ Đã gửi: bỏ điện thoại trung gian");
+  }
   function updateEsp() {
     const el = document.getElementById("esp");
     if (!espState) { el.textContent = ""; return; }
@@ -1355,6 +1427,7 @@
     }
     if (typeof netRateText === "function") { const nr = netRateText(); if (nr) parts.push('<span class="esp-rate">' + nr + "</span>"); }   // tốc độ đang dùng, cạnh sóng WiFi
     if (espUptime !== null && !isNaN(espUptime)) parts.push("chạy " + fmtDur(espUptime));
+    if (brMode === 1) parts.push("qua điện thoại trung gian");
     if (espRecon !== null && !isNaN(espRecon)) parts.push("nối lại MQTT " + Math.max(0, espRecon - 1) + " lần");
     if (espStall >= 500) parts.push('<span style="color:#ff9900">mạng kẹt lâu nhất ' + (espStall / 1000).toLocaleString("vi-VN", { maximumFractionDigits: 1 }) + " giây/phút</span>");
     if (espHeap !== null && !isNaN(espHeap)) parts.push("RAM trống " + Math.round(espHeap / 1024) + " KB");
