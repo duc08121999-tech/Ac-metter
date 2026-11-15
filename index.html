@@ -618,7 +618,7 @@
   // Nhận dữ liệu từ ESP32 và đẩy lên giao diện
   let gotData = false;
   let warned = false;
-  let espState = "", espRssi = null, espUptime = null, espRecon = null, espHeap = null, espDrc = 0, espDup = 0, espDout = 0, espRr = null, espRrn = 0, espWl = 0, espWr = 0;
+  let espStall = 0, espState = "", espRssi = null, espUptime = null, espRecon = null, espHeap = null, espDrc = 0, espDup = 0, espDout = 0, espRr = null, espRrn = 0, espWl = 0, espWr = 0;
   const cache = {};
   let lastMsg = 0, lastPow = 0, lastVol = 0;
   const powTimes = [];   // thời điểm các tin công suất đã nhận   // đo độ trễ và chu kỳ dữ liệu từ ESP32
@@ -627,7 +627,7 @@
   const MAP_INFO = { hn: "kwh_homnay", hq: "kwh_homqua", tn: "kwh_thangnay", tt: "kwh_thangtruoc", tong: "kwh_tong",
                      dtn: "tien_thangnay", dtt: "tien_thangtruoc", ngay: "status_ngaychot", gia: "status_dongia",
                      rssi: "rssi", up: "uptime", rc: "reconnects", heap: "heap", drc: "disc_rc", dup: "disc_up", dout: "disc_out", rr: "reset_reason", rrn: "reset_bad", wl: "wifi_lost", wr: "wifi_reason", fw: "fw_version", ip: "esp_ip", ota: "ota_min",
-                     gc: "gio_chot", ky: "ky_chot", cr: "cs_thangroi", ct: "cs_thangtruoc" };
+                     gc: "gio_chot", ky: "ky_chot", cr: "cs_thangroi", ct: "cs_thangtruoc", stl: "mq_stall" };
   function onMessageArrived(message) {
     const topic = message.destinationName.replace(TOPIC_PREFIX + "/", "");
     if (topic.indexOf("days/") === 0) { dayIngest(topic.slice(5), message.payloadString); return; }   // tiền từng ngày của 1 kỳ
@@ -663,6 +663,8 @@
       case "voltage":   setValue("v", payload, "V"); latestVoltage = Number(payload); break;
       case "current":   setValue("a", payload, "A"); break;
       case "power":
+        // ESP32 đang gửi số đo = đang trực tuyến (tin "offline" có thể đến trễ từ kết nối cũ của chính nó)
+        if (live && espState !== "online") { espState = "online"; try { updateEsp(); } catch (e) {} }
         setValue("w", payload, "W");
         latestPower = Number(payload);
         break;
@@ -674,6 +676,7 @@
       case "kwh_thangtruoc":  setValue("kwh_tt", payload, "kWh"); break;
       case "kwh_tong":        setValue("kwh_tong", payload, "kWh"); break;
       case "status":     if (live) { espState = payload; updateEsp(); } break;
+      case "mq_stall":   if (live) { espStall = Number(payload) || 0; updateEsp(); } break;
       case "rssi":       if (live) { espRssi = Number(payload); updateEsp(); } break;
       case "uptime":     if (live) { espUptime = Number(payload); updateEsp(); } break;
       case "reconnects": if (live) { espRecon = Number(payload); updateEsp(); } break;
@@ -1353,6 +1356,7 @@
     if (typeof netRateText === "function") { const nr = netRateText(); if (nr) parts.push('<span class="esp-rate">' + nr + "</span>"); }   // tốc độ đang dùng, cạnh sóng WiFi
     if (espUptime !== null && !isNaN(espUptime)) parts.push("chạy " + fmtDur(espUptime));
     if (espRecon !== null && !isNaN(espRecon)) parts.push("nối lại MQTT " + Math.max(0, espRecon - 1) + " lần");
+    if (espStall >= 500) parts.push('<span style="color:#ff9900">mạng kẹt lâu nhất ' + (espStall / 1000).toLocaleString("vi-VN", { maximumFractionDigits: 1 }) + " giây/phút</span>");
     if (espHeap !== null && !isNaN(espHeap)) parts.push("RAM trống " + Math.round(espHeap / 1024) + " KB");
     el.style.color = "#7ddc9a";
     let html = parts.join(" · ");
