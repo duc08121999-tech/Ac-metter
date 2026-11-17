@@ -383,6 +383,10 @@
     .esp-rate { color: #6b7385; }
     .diag-line { color: #5b6475; }
     .split > div:first-child { border-right-color: #eef1f6; }
+    .ipm { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; } .ipm button { padding: 9px 4px; font-size: 13px; }
+    .ip-g { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+    .ip-g label { font-size: 11.5px; color: #6b7385; font-weight: 600; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+    .ip-g input { width: 100%; padding: 9px 8px; font-size: 14px; border-radius: 8px; box-sizing: border-box; text-align: left; }
     #v { color: #ef4444 !important; } #a { color: #16a34a !important; } #w { color: #f08c00 !important; } #hz, #pf { color: #0e9fc0 !important; }
   </style>
 </head>
@@ -757,6 +761,23 @@
         </div>
       </div>
     </div>
+    <div class="row r1">
+      <div class="card setting">
+        <div class="label" style="color:var(--neon-orange);">🌐 Địa chỉ IP của ESP32</div>
+        <div class="set-cur">Đang dùng: <b id="ip_st">--</b></div>
+        <div class="range ipm" id="ipMode" style="margin-top:10px"><button data-m="auto">Tự động (DHCP)</button><button data-m="static">IP tĩnh</button></div>
+        <div id="ipBox" style="display:none">
+          <div class="ip-g">
+            <label>Địa chỉ IP<input type="text" id="ip_a" inputmode="decimal" placeholder="192.168.1.200"></label>
+            <label>Cổng (gateway)<input type="text" id="ip_g" inputmode="decimal" placeholder="192.168.1.1"></label>
+            <label>Mặt nạ mạng<input type="text" id="ip_m" inputmode="decimal" placeholder="255.255.255.0"></label>
+            <label>DNS<input type="text" id="ip_d" inputmode="decimal" placeholder="8.8.8.8"></label>
+          </div>
+          <div class="set-cur" style="margin-top:8px">Nên chọn số cuối lớn (VD <b>.200</b>) để không trùng máy khác. IP tĩnh chỉ dùng cho mạng WiFi đang nối; nếu sau 90 giây ESP32 không vào lại được mạng, nó tự quay về Tự động.</div>
+        </div>
+        <button id="ipSave" style="width:100%;margin-top:10px">Lưu</button>
+      </div>
+    </div>
     <div class="sec-title">Trạng thái kết nối</div>
     <div class="row r1">
       <div class="card diag">
@@ -978,7 +999,8 @@
       let obj = null;
       try { obj = JSON.parse(message.payloadString); } catch (err) { return; }
       if (!obj || typeof obj !== "object") return;       // tin rỗng/"null"/không phải JSON dạng đối tượng
-      if (topic === "data") { try { sxLivePush(obj); } catch (e) {} }   // biểu đồ điện áp + dòng điện trực tiếp (SCADA)
+      if (topic === "data") { try { sxLivePush(obj); } catch (e) {} }
+      if (topic === "info") { try { ipIngest(obj); } catch (e) {} }   // IP tĩnh / tự động   // biểu đồ điện áp + dòng điện trực tiếp (SCADA)
       const map = topic === "data" ? MAP_DATA : MAP_INFO;
       for (const k in map) if (obj[k] !== undefined && obj[k] !== null) ingest(map[k], String(obj[k]));
       return;
@@ -2138,6 +2160,52 @@
     if (sendCmd("cmd", "err_clear")) { document.getElementById("errCnt").textContent = "Đã gửi lệnh xoá, đang chờ ESP32..."; }
   }
   errRender();
+
+  // ================= IP TĨNH / TỰ ĐỘNG CỦA ESP32 =================
+  // info: "ip","gw","mk","dns","ipm" (0 tự động, 1 tĩnh, 2 tĩnh cho mạng khác, 3 đang thử), "ips" (mạng WiFi dùng IP tĩnh)
+  let ipInfo = null, ipSel = null, ipTouched = false;
+  const ipRe = /^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$/;
+  function ipIngest(o) {
+    if (o.ipm === undefined) return;
+    ipInfo = o;
+    if (ipSel === null) ipSel = (o.ipm === 1 || o.ipm === 3) ? "static" : "auto";
+    if (!ipTouched) {                                              // điền sẵn số đang dùng
+      const ipEl = document.getElementById("ip_a");
+      if (document.activeElement && document.activeElement.closest && document.activeElement.closest(".ip-g")) return ipShow();
+      ipEl.value = o.ip || ""; document.getElementById("ip_g").value = o.gw || "";
+      document.getElementById("ip_m").value = o.mk || "255.255.255.0"; document.getElementById("ip_d").value = (o.dns && o.dns !== "0.0.0.0") ? o.dns : "8.8.8.8";
+    }
+    ipShow();
+  }
+  function ipShow() {
+    const st = document.getElementById("ip_st");
+    if (ipInfo) {
+      const m = ipInfo.ipm;
+      st.textContent = m === 1 ? "IP tĩnh " + ipInfo.ip + (ipInfo.ips ? " (mạng " + ipInfo.ips + ")" : "")
+        : m === 3 ? "IP tĩnh " + ipInfo.ip + " · đang thử..."
+        : "Tự động · " + ipInfo.ip + (m === 2 ? " (IP tĩnh đã đặt cho mạng " + ipInfo.ips + ")" : "");
+      st.style.color = m === 1 ? "#16a34a" : (m === 3 ? "#d97706" : "");
+    }
+    document.querySelectorAll("#ipMode button").forEach(b => b.classList.toggle("on", b.dataset.m === (ipSel || "auto")));
+    document.getElementById("ipBox").style.display = ipSel === "static" ? "" : "none";
+  }
+  document.getElementById("ipMode").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; ipSel = b.dataset.m; ipShow(); });
+  document.querySelectorAll(".ip-g input").forEach(i => i.addEventListener("input", () => { ipTouched = true; }));
+  document.getElementById("ipSave").addEventListener("click", () => {
+    if (ipSel !== "static") {
+      if (confirm("Chuyển ESP32 về IP tự động (DHCP)?\nESP32 sẽ nối lại WiFi trong vài giây.") && sendCmd("cmd", "ip auto")) { ipTouched = false; alert("✔️ Đã gửi: ESP32 về IP tự động"); }
+      return;
+    }
+    const v = id => document.getElementById(id).value.trim();
+    const a = v("ip_a"), g = v("ip_g"), m = v("ip_m") || "255.255.255.0", d = v("ip_d") || "8.8.8.8";
+    for (const [x, n] of [[a, "Địa chỉ IP"], [g, "Cổng (gateway)"], [m, "Mặt nạ mạng"], [d, "DNS"]]) if (!ipRe.test(x)) { alert(n + " không đúng dạng, ví dụ 192.168.1.200"); return; }
+    const n4 = x => x.split(".").reduce((s, k) => s * 256 + Number(k), 0);
+    if ((n4(a) & n4(m)) >>> 0 !== (n4(g) & n4(m)) >>> 0) { alert("IP và cổng (gateway) phải cùng dải, ví dụ IP 192.168.1.200 với cổng 192.168.1.1"); return; }
+    if (a === g) { alert("IP không được trùng cổng (gateway)"); return; }
+    if (!confirm("Đặt IP tĩnh " + a + " cho ESP32?\nESP32 sẽ nối lại WiFi. Nếu sau 90 giây không vào được mạng, nó tự quay về Tự động.")) return;
+    if (sendCmd("cmd", "ip static " + a + " " + g + " " + m + " " + d)) { ipTouched = false; alert("✔️ Đã gửi: ESP32 đang chuyển sang IP " + a); }
+  });
+  ipShow();
 
   // ================= SCADA: GIAO DIỆN SÁNG KIỂU DATALOGGER (lưới điện + tải) =================
   // Trang chủ: tổng quan, luồng năng lượng, biểu đồ điện áp + dòng điện trực tiếp
