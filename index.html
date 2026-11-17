@@ -314,6 +314,9 @@
     .sx-two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
     .sx-two button { background: #fff; color: #1f2633; border: 1.5px solid #e0e5ed; border-radius: 8px; }
     .sx-two button.go { border-color: #22b35e; color: #15803d; } .sx-two button.st { border-color: #ef4444; color: #dc2626; }
+    .sx-two button { transition: background .25s, color .25s, box-shadow .25s; }
+    .sx-two button.go.act { background: #22b35e; color: #fff; box-shadow: 0 2px 10px rgba(34, 179, 94, .35); }
+    .sx-two button.st.act { background: #ef4444; color: #fff; box-shadow: 0 2px 10px rgba(239, 68, 68, .35); }
     .sx-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px solid #f1f3f7; font-size: 14px; }
     .sx-row:last-of-type { border-bottom: 0; }
     .sx-row select { width: 46%; background: #fff; border: 1px solid #e0e5ed; padding: 8px; color: #1f2633; font-size: 14px; border-radius: 6px; outline: none; color-scheme: light; }
@@ -2533,6 +2536,10 @@
     const on = sxEl("scOnTxt");
     on.textContent = scUi.on ? "● Đang sáng" : "○ Đang tắt";
     on.style.color = scUi.on ? "#16a34a" : "#8a93a6";
+    const bOn = document.querySelector('#scCtl1 .sx-two .go'), bOff = document.querySelector('#scCtl1 .sx-two .st');
+    bOn.classList.toggle("act", !!scUi.on); bOff.classList.toggle("act", !scUi.on);
+    bOn.textContent = scUi.on ? "● Màn hình đang bật" : "Bật màn hình";
+    bOff.textContent = scUi.on ? "Tắt màn hình" : "● Màn hình đang tắt";
     const key = SC_PG_KEY[scUi.pg];
     sxEl("scPages").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.pg === key));
     const br = sxEl("scBright");
